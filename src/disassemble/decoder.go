@@ -1,21 +1,23 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type Opcode uint8
 
 const (
-	opcodeLUI    Opcode = 0b00110111
-	opcodeLOAD   Opcode = 0b00000011
-	opcodeSTORE  Opcode = 0b00100011
-	opcodeAUIPC  Opcode = 0b00010111
-	opcodeBRANCH Opcode = 0b01100011
-	opcodeJAL    Opcode = 0b01101111
-	opcodeJALR   Opcode = 0b01100111
-	opcodeIMM    Opcode = 0b00010011
-	opcodeOP     Opcode = 0b00110011
-	opcodeMISC   Opcode = 0b00001111
-	opcodeSYSTEM Opcode = 0b01110011
+	opcodeLUI      Opcode = 0b00110111
+	opcodeLOAD     Opcode = 0b00000011
+	opcodeSTORE    Opcode = 0b00100011
+	opcodeAUIPC    Opcode = 0b00010111
+	opcodeBRANCH   Opcode = 0b01100011
+	opcodeJAL      Opcode = 0b01101111
+	opcodeJALR     Opcode = 0b01100111
+	opcodeOP_IMM   Opcode = 0b00010011
+	opcodeOP       Opcode = 0b00110011
+	opcodeMISC_MEM Opcode = 0b00001111
+	opcodeSYSTEM   Opcode = 0b01110011
 )
 
 type Func3 uint8
@@ -70,35 +72,6 @@ const (
 	func3CSRRCI Func3 = 0b111
 )
 
-func (c Opcode) String() string {
-	switch c {
-	case opcodeLUI:
-		return "lui"
-	case opcodeLOAD:
-		return "load"
-	case opcodeSTORE:
-		return "store"
-	case opcodeAUIPC:
-		return "auipc"
-	case opcodeBRANCH:
-		return "branch"
-	case opcodeJAL:
-		return "jal"
-	case opcodeJALR:
-		return "jalr"
-	case opcodeIMM:
-		return "imm"
-	case opcodeOP:
-		return "op"
-	case opcodeMISC:
-		return "misc"
-	case opcodeSYSTEM:
-		return "system"
-	}
-
-	return fmt.Sprintf("?? %#x", c)
-}
-
 func (f3 Func3) Branch() string {
 	switch f3 {
 	case 0b000:
@@ -113,6 +86,36 @@ func (f3 Func3) Branch() string {
 		return "bltu"
 	case 0b111:
 		return "bgeu"
+	}
+
+	panic(fmt.Sprintf("f3 out of range: %#x", f3))
+}
+
+func (f3 Func3) Load() string {
+	switch f3 {
+	case 0b000:
+		return "lb"
+	case 0b001:
+		return "lh"
+	case 0b010:
+		return "lw"
+	case 0b100:
+		return "lbu"
+	case 0b101:
+		return "lhu"
+	}
+
+	panic(fmt.Sprintf("f3 out of range: %#x", f3))
+}
+
+func (f3 Func3) Store() string {
+	switch f3 {
+	case 0b000:
+		return "sb"
+	case 0b001:
+		return "sh"
+	case 0b010:
+		return "sw"
 	}
 
 	panic(fmt.Sprintf("f3 out of range: %#x", f3))
@@ -186,9 +189,13 @@ func (f3 Func3) Misc() string {
 	panic(fmt.Sprintf("f3 out of range: %#x", f3))
 }
 
-func (f3 Func3) System() string {
+func (f3 Func3) System(imm uint32) string {
 	switch f3 {
 	case 0b000:
+		if imm>>20 == 1 {
+			return "ebreak"
+		}
+
 		return "ecall"
 	case 0b001:
 		return "csrrw"
@@ -202,29 +209,6 @@ func (f3 Func3) System() string {
 		return "csrrsi"
 	case 0b111:
 		return "csrrci"
-	}
-
-	panic(fmt.Sprintf("f3 out of range: %#x", f3))
-}
-
-func (f3 Func3) String() string {
-	switch f3 {
-	case 0b000:
-		return "add/sub/addi/beq/lb/sb/ecall"
-	case 0b001:
-		return "slli/bne/lh/sh/csrrw"
-	case 0b010:
-		return "slt/lw/sw/csrrs"
-	case 0b011:
-		return "sltu/sltui/scrrc"
-	case 0b100:
-		return "xor/xori/blt/lbu"
-	case 0b101:
-		return "srl/srli/sra/srai/bge/lhu/csrrwi"
-	case 0b110:
-		return "or/ori/bltu/csrrsi"
-	case 0b111:
-		return "and/andi/bgeu/csrrci"
 	}
 
 	panic(fmt.Sprintf("f3 out of range: %#x", f3))
@@ -302,7 +286,7 @@ func (r Register) String() string {
 		return "t7"
 	}
 
-	return fmt.Sprintf("?? %x", uint8(r))
+	panic(fmt.Sprintf("illegal register %#x", uint8(r)))
 }
 
 func decode(s *Section, addr, raw uint32) string {
@@ -327,57 +311,57 @@ func decode(s *Section, addr, raw uint32) string {
 	imm_b := sign_extend(bits(32, 31)<<12|bits(30, 25)<<5|bits(11, 8)<<1|bits(8, 7)<<11, 13)
 	imm_i := sign_extend(bits(31, 20), 12)
 	imm_j := sign_extend(bits(32, 31)<<20|bits(30, 21)<<1|bits(21, 20)<<11|bits(19, 12)<<12, 21)
+	imm_s := sign_extend(bits(31, 25)<<5|bits(11, 7), 12)
 	imm_u := sign_extend(bits(31, 12), 32)
 
 	// registers
-	d := Register(bits(11, 7))
-	s1 := Register(bits(19, 15))
-	s2 := Register(bits(24, 20))
-	_ = s2
+	rd := Register(bits(11, 7))
+	rs1 := Register(bits(19, 15))
+	rs2 := Register(bits(24, 20))
 
-	func3 := Func3(bits(14, 12))
-	func7 := bits(31, 25)
+	fn3 := Func3(bits(14, 12))
+	fn7 := bits(31, 25)
 
 	switch opcode {
 	case opcodeLUI: // U
-		return fmt.Sprintf("lui %s, %#x", d, imm_u)
-	case opcodeLOAD: // I
-		return fmt.Sprintf("load")
-	case opcodeSTORE: // S
-		return fmt.Sprintf("store")
+		return fmt.Sprintf("lui %s, %#x",
+			rd, imm_u)
 	case opcodeAUIPC: // U
-		return fmt.Sprintf("auipc %s, %#x", d, imm_u)
-	case opcodeBRANCH: // B
-		addr += imm_b
-
-		sym := ""
-		if s.symbols[addr] != "" {
-			sym = "<" + s.symbols[addr] + ">"
-		}
-
-		return fmt.Sprintf("%s %s, %s, %08x %s",
-			func3.Branch(), s1, s2, addr, sym)
+		return fmt.Sprintf("auipc %s, %#x",
+			rd, imm_u)
 	case opcodeJAL: // J
 		addr += imm_j
 
-		sym := ""
-		if s.symbols[addr] != "" {
-			sym = "<" + s.symbols[addr] + ">"
-		}
-
-		return fmt.Sprintf("jal %08x %s", addr, sym)
+		return fmt.Sprintf("jal %08x %s",
+			addr, s.NearestSymbol(addr))
 	case opcodeJALR: // I
-		return fmt.Sprintf("jalr %s, %#x", s1, imm_i)
-	case opcodeIMM: // I
-		return fmt.Sprintf("%s %s, %s, %#x", func3.Arith(true, func7 == 0b0100000 && func3 == func3SRAI),
-			d, s1, imm_i)
+		return fmt.Sprintf("jalr %s, %#x",
+			rs1, imm_i)
+	case opcodeBRANCH: // B
+		addr += imm_b
+
+		return fmt.Sprintf("%s %s, %s, %08x %s",
+			fn3.Branch(), rs1, rs2, addr, s.NearestSymbol(addr))
+	case opcodeLOAD: // I
+		return fmt.Sprintf("%s %s, %s+%#x",
+			fn3.Load(), rd, rs1, imm_i)
+	case opcodeSTORE: // S
+		return fmt.Sprintf("%s %s+%#x, %s",
+			fn3.Store(), rs1, imm_s, rs2)
+	case opcodeOP_IMM: // I
+		return fmt.Sprintf("%s %s, %s, %#x",
+			fn3.Arith(true, fn7 == 0b0100000 && fn3 == func3SRAI),
+			rd, rs1, imm_i)
 	case opcodeOP: // R
-		return fmt.Sprintf("%s %s, %s, %s", func3.Arith(false, func7 == 0b0100000), d, s1, s2)
-	case opcodeMISC:
-		return fmt.Sprintf("%s", func3.Misc())
+		return fmt.Sprintf("%s %s, %s, %s",
+			fn3.Arith(false, fn7 == 0b0100000), rd, rs1, rs2)
+	case opcodeMISC_MEM:
+		return fmt.Sprintf("%s",
+			fn3.Misc())
 	case opcodeSYSTEM: // I
-		return fmt.Sprintf("%s", func3.System())
+		return fmt.Sprintf("%s",
+			fn3.System(imm_i))
 	}
 
-	return fmt.Sprintf("%s %s %#b", opcode, func3, func7)
+	panic(fmt.Sprintf("unknown opcode: %v", opcode))
 }
