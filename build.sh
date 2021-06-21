@@ -1,2 +1,2 @@
 #!/bin/bash
-go build -o bin/decompile ./src/decompile/
+go build -o bin/disassemble ./src/disassemble/
