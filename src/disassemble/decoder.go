@@ -31,7 +31,7 @@ const (
 	func3SLLI  Func3 = 0b001
 	func3SLT   Func3 = 0b010
 	func3SLTU  Func3 = 0b011
-	func3SLTIU Func3 = 0b011
+	func3SLTUI Func3 = 0b011
 
 	func3XOR  Func3 = 0b100
 	func3XORI Func3 = 0b100
@@ -62,8 +62,12 @@ const (
 	func3LBU Func3 = 0b100
 	func3LHU Func3 = 0b101
 
-	// Misc/System
+	// Misc
 	func3ECALL  Func3 = 0b000
+	func3EBREAK Func3 = 0b000
+
+	// System
+	func3FENCE  Func3 = 0b000
 	func3CSRRW  Func3 = 0b001
 	func3CSRRS  Func3 = 0b010
 	func3CSRRC  Func3 = 0b011
@@ -74,17 +78,17 @@ const (
 
 func (f3 Func3) Branch() string {
 	switch f3 {
-	case 0b000:
+	case func3BEQ:
 		return "beq"
-	case 0b001:
+	case func3BNE:
 		return "bne"
-	case 0b100:
+	case func3BLT:
 		return "blt"
-	case 0b101:
+	case func3BGE:
 		return "bge"
-	case 0b110:
+	case func3BLTU:
 		return "bltu"
-	case 0b111:
+	case func3BGEU:
 		return "bgeu"
 	}
 
@@ -93,15 +97,15 @@ func (f3 Func3) Branch() string {
 
 func (f3 Func3) Load() string {
 	switch f3 {
-	case 0b000:
+	case func3LB:
 		return "lb"
-	case 0b001:
+	case func3LH:
 		return "lh"
-	case 0b010:
+	case func3LW:
 		return "lw"
-	case 0b100:
+	case func3LBU:
 		return "lbu"
-	case 0b101:
+	case func3LHU:
 		return "lhu"
 	}
 
@@ -110,11 +114,11 @@ func (f3 Func3) Load() string {
 
 func (f3 Func3) Store() string {
 	switch f3 {
-	case 0b000:
+	case func3SB:
 		return "sb"
-	case 0b001:
+	case func3SH:
 		return "sh"
-	case 0b010:
+	case func3SW:
 		return "sw"
 	}
 
@@ -122,59 +126,53 @@ func (f3 Func3) Store() string {
 }
 
 func (f3 Func3) Arith(imm, alt bool) string {
-	switch f3 {
-	case 0b000:
-		if alt {
+	switch {
+	case alt && imm:
+		switch f3 {
+		case func3SRAI:
+			return "srai"
+		}
+	case alt:
+		switch f3 {
+		case func3SUB:
 			return "sub"
-		}
-
-		if imm {
-			return "addi"
-		}
-
-		return "add"
-	case 0b001:
-		return "slli"
-	case 0b010:
-		return "slt"
-	case 0b011:
-		if imm {
-			return "sltui"
-		}
-
-		return "sltu"
-	case 0b100:
-		if imm {
-			return "xori"
-		}
-
-		return "xor"
-	case 0b101:
-		if alt {
-			if imm {
-				return "srai"
-			}
-
+		case func3SRA:
 			return "sra"
 		}
-
-		if imm {
+	case imm:
+		switch f3 {
+		case func3ADDI:
+			return "addi"
+		case func3SLTUI:
+			return "sltui"
+		case func3XORI:
+			return "xori"
+		case func3SLLI:
+			return "slli"
+		case func3SRLI:
 			return "srli"
-		}
-
-		return "srl"
-	case 0b110:
-		if imm {
+		case func3ORI:
 			return "ori"
-		}
-
-		return "or"
-	case 0b111:
-		if imm {
+		case func3ANDI:
 			return "andi"
 		}
-
-		return "and"
+	default:
+		switch f3 {
+		case func3ADD: // 000
+			return "add"
+		case func3SLT: // 010
+			return "slt"
+		case func3SLTU: // 011
+			return "sltu"
+		case func3XOR: // 100
+			return "xor"
+		case func3SRL: // 101
+			return "srl"
+		case func3OR: // 110
+			return "or"
+		case func3AND: // 111
+			return "and"
+		}
 	}
 
 	panic(fmt.Sprintf("f3 out of range: %#x", f3))
@@ -182,7 +180,7 @@ func (f3 Func3) Arith(imm, alt bool) string {
 
 func (f3 Func3) Misc() string {
 	switch f3 {
-	case 0b000:
+	case func3FENCE:
 		return "fence"
 	}
 
@@ -191,23 +189,23 @@ func (f3 Func3) Misc() string {
 
 func (f3 Func3) System(imm uint32) string {
 	switch f3 {
-	case 0b000:
+	case func3ECALL: // or func3EBREAK
 		if imm>>20 == 1 {
 			return "ebreak"
 		}
 
 		return "ecall"
-	case 0b001:
+	case func3CSRRW:
 		return "csrrw"
-	case 0b010:
+	case func3CSRRS:
 		return "csrrs"
-	case 0b011:
+	case func3CSRRC:
 		return "scrrc"
-	case 0b101:
+	case func3CSRRWI:
 		return "csrrwi"
-	case 0b110:
+	case func3CSRRSI:
 		return "csrrsi"
-	case 0b111:
+	case func3CSRRCI:
 		return "csrrci"
 	}
 
@@ -217,73 +215,20 @@ func (f3 Func3) System(imm uint32) string {
 type Register uint8
 
 func (r Register) String() string {
-	switch r {
-	case 0:
-		return "zero"
-	case 1:
-		return "ra"
-	case 2:
-		return "sp"
-	case 3:
-		return "gp"
-	case 4:
-		return "tp"
-	case 5:
-		return "t0"
-	case 6:
-		return "t1"
-	case 7:
-		return "t2"
-	case 8:
-		return "s0"
-	case 9:
-		return "s1"
-	case 10:
-		return "a0"
-	case 11:
-		return "a1"
-	case 12:
-		return "a2"
-	case 13:
-		return "a3"
-	case 14:
-		return "a4"
-	case 15:
-		return "a5"
-	case 16:
-		return "a6"
-	case 17:
-		return "a7"
-	case 18:
-		return "s2"
-	case 19:
-		return "s3"
-	case 20:
-		return "s4"
-	case 21:
-		return "s5"
-	case 22:
-		return "s6"
-	case 23:
-		return "s7"
-	case 24:
-		return "s8"
-	case 25:
-		return "s9"
-	case 26:
-		return "s10"
-	case 27:
-		return "s11"
-	case 28:
-		return "t3"
-	case 29:
-		return "t4"
-	case 30:
-		return "t5"
-	case 31:
-		return "t6"
-	case 32:
-		return "t7"
+	names := map[Register]string{
+		0: "zero",
+		1: "ra", 2: "sp", 3: "gp", 4: "tp",
+		5: "t0", 6: "t1", 7: "t2", 28: "t3",
+		29: "t4", 30: "t5", 31: "t6", 32: "t7",
+		8: "s0", 9: "s1", 18: "s2", 19: "s3",
+		20: "s4", 21: "s5", 22: "s6", 23: "s7",
+		24: "s8", 25: "s9", 26: "s10", 27: "s11",
+		10: "a0", 11: "a1", 12: "a2", 13: "a3",
+		14: "a4", 15: "a5", 16: "a6", 17: "a7",
+	}
+
+	if v, ok := names[r]; ok {
+		return v
 	}
 
 	panic(fmt.Sprintf("illegal register %#x", uint8(r)))
@@ -292,6 +237,9 @@ func (r Register) String() string {
 func decode(s *Section, addr, raw uint32) string {
 	if raw == 0 {
 		return "unimp"
+	} else if raw == 0x13 {
+		// addi x0,x0,0 == nop
+		return "nop"
 	}
 
 	// bits gets the bits [s..e] from raw (shifted down)
@@ -323,44 +271,47 @@ func decode(s *Section, addr, raw uint32) string {
 	fn7 := bits(31, 25)
 
 	switch opcode {
-	case opcodeLUI: // U
+	case opcodeLUI: // U-type
 		return fmt.Sprintf("lui %s, %#x",
 			rd, imm_u)
-	case opcodeAUIPC: // U
+	case opcodeAUIPC: // U-type
 		return fmt.Sprintf("auipc %s, %#x",
 			rd, imm_u)
-	case opcodeJAL: // J
-		addr += imm_j
-
+	case opcodeJAL: // J-type
 		return fmt.Sprintf("jal %08x %s",
-			addr, s.NearestSymbol(addr))
-	case opcodeJALR: // I
+			addr+imm_j, s.NearestSymbol(addr+imm_j))
+	case opcodeJALR: // I-type
 		return fmt.Sprintf("jalr %s, %#x",
 			rs1, imm_i)
-	case opcodeBRANCH: // B
-		addr += imm_b
-
+	case opcodeBRANCH: // B-type
 		return fmt.Sprintf("%s %s, %s, %08x %s",
-			fn3.Branch(), rs1, rs2, addr, s.NearestSymbol(addr))
-	case opcodeLOAD: // I
+			fn3.Branch(), rs1, rs2, addr+imm_b, s.NearestSymbol(addr+imm_b))
+	case opcodeLOAD: // I-type
 		return fmt.Sprintf("%s %s, %s+%#x",
 			fn3.Load(), rd, rs1, imm_i)
-	case opcodeSTORE: // S
+	case opcodeSTORE: // S-type
 		return fmt.Sprintf("%s %s+%#x, %s",
 			fn3.Store(), rs1, imm_s, rs2)
-	case opcodeOP_IMM: // I
-		return fmt.Sprintf("%s %s, %s, %#x",
-			fn3.Arith(true, fn7 == 0b0100000 && fn3 == func3SRAI),
-			rd, rs1, imm_i)
-	case opcodeOP: // R
+	case opcodeOP_IMM: // I-type
+		switch fn3 {
+		case func3SLLI, func3SRLI:
+			shamt := imm_i & 0b11111
+			return fmt.Sprintf("%s %s, %s, %#x",
+				fn3.Arith(true, fn7 == 0b0100000 && fn3 == func3SRAI),
+				rd, rs1, shamt)
+		default:
+			return fmt.Sprintf("%s %s, %s, %#x",
+				fn3.Arith(true, false), rd, rs1, imm_i)
+		}
+	case opcodeOP: // R-type
 		return fmt.Sprintf("%s %s, %s, %s",
 			fn3.Arith(false, fn7 == 0b0100000), rd, rs1, rs2)
+	case opcodeSYSTEM: // I-type
+		return fmt.Sprintf("%s",
+			fn3.System(imm_i))
 	case opcodeMISC_MEM:
 		return fmt.Sprintf("%s",
 			fn3.Misc())
-	case opcodeSYSTEM: // I
-		return fmt.Sprintf("%s",
-			fn3.System(imm_i))
 	}
 
 	panic(fmt.Sprintf("unknown opcode: %v", opcode))
