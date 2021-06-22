@@ -9,6 +9,15 @@ type instruction struct {
 	sym     string
 }
 
+func decodeInstruction(section *Section, addr, raw uint32, sym string) Instruction {
+	return &instruction{
+		section: section,
+		addr:    addr,
+		sym:     sym,
+		raw:     raw,
+	}
+}
+
 func (i *instruction) Section() *Section {
 	return i.section
 }
@@ -23,42 +32,6 @@ func (i *instruction) Raw() uint32 {
 
 func (i *instruction) Sym() string {
 	return i.sym
-}
-
-func (i *instruction) nearestSymbol(addr uint32) string {
-	return i.section.NearestSymbol(addr)
-}
-
-func (i *instruction) target(offset uint32) uint32 {
-	return uint32(int64(i.Addr()) + int64(offset))
-}
-
-func (i *instruction) decodeBranch() string {
-	return i.Func3().Branch()
-}
-
-func (i *instruction) decodeArith(imm bool) string {
-	return i.Func3().Arith(imm, i.Func7() == 0b0100000 && i.Func3() == func3SRAI)
-}
-
-func (i *instruction) decodeLoad() string {
-	return i.Func3().Load()
-}
-
-func (i *instruction) decodeStore() string {
-	return i.Func3().Store()
-}
-
-func (i *instruction) decodeSystem() string {
-	return i.Func3().System(i.Imm())
-}
-
-func (i *instruction) decodeMisc() string {
-	return i.Func3().Misc()
-}
-
-func (i *instruction) shamt() uint8 {
-	return uint8(i.Imm() & 0b11111)
 }
 
 func (i *instruction) Text() string {
@@ -141,4 +114,40 @@ func (i *instruction) Func7() uint8 {
 
 func (i *instruction) bits(s, e int) uint32 {
 	return (i.raw >> e) & ((1 << (s - e + 1)) - 1)
+}
+
+func (i *instruction) nearestSymbol(addr uint32) string {
+	return i.section.NearestSymbol(addr)
+}
+
+func (i *instruction) target(offset uint32) uint32 {
+	return uint32(int64(i.Addr()) + int64(offset))
+}
+
+func (i *instruction) decodeBranch() string {
+	return i.Func3().Branch()
+}
+
+func (i *instruction) decodeArith(imm bool) string {
+	return i.Func3().Arith(imm, i.Func7() == 0b0100000 && i.Func3() == func3SRAI)
+}
+
+func (i *instruction) decodeLoad() string {
+	return i.Func3().Load()
+}
+
+func (i *instruction) decodeStore() string {
+	return i.Func3().Store()
+}
+
+func (i *instruction) decodeSystem() string {
+	return i.Func3().System(i.Imm())
+}
+
+func (i *instruction) decodeMisc() string {
+	return i.Func3().Misc()
+}
+
+func (i *instruction) shamt() uint8 {
+	return uint8(i.Imm() & 0b11111)
 }

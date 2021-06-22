@@ -82,12 +82,7 @@ func (r *SectionReader) Next() Instruction {
 	addr := r.section.AddrForIndex(r.index)
 	raw := r.section.data[r.index]
 
-	inst := &instruction{
-		section: r.section,
-		addr:    addr,
-		sym:     sym,
-		raw:     raw,
-	}
+	inst := decodeInstruction(r.section, addr, raw, sym)
 
 	r.index++
 
