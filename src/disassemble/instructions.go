@@ -3,19 +3,291 @@ package main
 import "fmt"
 
 type instruction struct {
-	section *Section
-	addr    uint32
-	raw     uint32
-	sym     string
+	section  *Section
+	addr     uint32
+	raw      uint32
+	sym      string
+	mnemonic string
 }
 
-func decodeInstruction(section *Section, addr, raw uint32, sym string) Instruction {
-	return &instruction{
-		section: section,
-		addr:    addr,
-		sym:     sym,
-		raw:     raw,
+type Unimp struct {
+	*instruction
+}
+
+type Lui struct {
+	*instruction
+}
+
+type Auipc struct {
+	*instruction
+}
+
+type Jal struct {
+	*instruction
+}
+
+type Jalr struct {
+	*instruction
+}
+
+type branch struct {
+	*instruction
+}
+
+type Beq struct {
+	*branch
+}
+
+type Bne struct {
+	*branch
+}
+
+type Blt struct {
+	*branch
+}
+
+type Bge struct {
+	*branch
+}
+
+type Bltu struct {
+	*branch
+}
+
+type Bgeu struct {
+	*branch
+}
+
+type load struct {
+	*instruction
+}
+
+type Lb struct {
+	*load
+}
+
+type Lh struct {
+	*load
+}
+
+type Lw struct {
+	*load
+}
+
+type Lbu struct {
+	*load
+}
+
+type Lhu struct {
+	*load
+}
+
+type store struct {
+	*instruction
+}
+
+type Sb struct {
+	*store
+}
+
+type Sh struct {
+	*store
+}
+
+type Sw struct {
+	*store
+}
+
+type Fence struct {
+	*instruction
+}
+
+type system struct {
+	*instruction
+}
+
+type Ebreak struct {
+	*system
+}
+
+type Ecall struct {
+	*system
+}
+
+type Csrrw struct {
+	*system
+}
+
+type Csrrs struct {
+	*system
+}
+
+type Csrrc struct {
+	*system
+}
+
+type Csrrwi struct {
+	*system
+}
+
+type Csrrsi struct {
+	*system
+}
+
+type Csrrci struct {
+	*system
+}
+
+type opReg struct {
+	*instruction
+}
+
+type Sub struct {
+	*opReg
+}
+
+type Sra struct {
+	*opReg
+}
+
+type Add struct {
+	*opReg
+}
+
+type Slt struct {
+	*opReg
+}
+
+type Sltu struct {
+	*opReg
+}
+
+type Xor struct {
+	*opReg
+}
+
+type Srl struct {
+	*opReg
+}
+
+type Or struct {
+	*opReg
+}
+
+type And struct {
+	*opReg
+}
+
+type opImm struct {
+	*instruction
+}
+
+type Srai struct {
+	*opImm
+}
+
+type Addi struct {
+	*opImm
+}
+
+type Sltui struct {
+	*opImm
+}
+
+type Xori struct {
+	*opImm
+}
+
+type Slli struct {
+	*opImm
+}
+
+type Srli struct {
+	*opImm
+}
+
+type Ori struct {
+	*opImm
+}
+
+type Andi struct {
+	*opImm
+}
+
+func (i *Unimp) Text() string {
+	return "unimp"
+}
+
+func (i *Lui) Text() string {
+	return fmt.Sprintf("lui %s, %#x",
+		i.Rd(), i.Imm())
+}
+
+func (i *Auipc) Text() string {
+	return fmt.Sprintf("auipc %s, %#x",
+		i.Rd(), i.Imm())
+}
+
+func (i *Jal) Text() string {
+	addr := i.target(i.Imm())
+
+	return fmt.Sprintf("jal %08x %s",
+		addr, i.nearestSymbol(addr))
+}
+
+func (i *Jalr) Text() string {
+	return fmt.Sprintf("jalr %s, %#x",
+		i.Rs1(), i.Imm())
+}
+
+func (i *branch) Text() string {
+	addr := i.target(i.Imm())
+
+	return fmt.Sprintf("%s %s, %s, %08x %s",
+		i.Mnemonic(), i.Rs1(), i.Rs2(), addr, i.nearestSymbol(addr))
+}
+
+func (i *load) Text() string {
+	return fmt.Sprintf("%s %s, %s+%#x",
+		i.Mnemonic(), i.Rd(), i.Rs1(), i.Imm())
+}
+
+func (i *store) Text() string {
+	return fmt.Sprintf("%s %s+%#x, %s",
+		i.Mnemonic(), i.Rs1(), i.Imm(), i.Rs2())
+}
+
+func (i *Fence) Text() string {
+	return i.Mnemonic()
+}
+
+func (i *system) Text() string {
+	return i.Mnemonic()
+}
+
+func (i *opReg) Text() string {
+	return fmt.Sprintf("%s %s, %s, %s",
+		i.Mnemonic(), i.Rd(), i.Rs1(), i.Rs2())
+}
+
+func (i *opImm) Text() string {
+	switch i.Func3() {
+	case func3SLLI, func3SRLI:
+		return fmt.Sprintf("%s %s, %s, %#x",
+			i.Mnemonic(), i.Rd(), i.Rs1(), i.shamt())
+	default:
+		return fmt.Sprintf("%s %s, %s, %#x",
+			i.Mnemonic(), i.Rd(), i.Rs1(), i.Imm())
 	}
+}
+
+func (i *Addi) Text() string {
+	// Syntax sugar: addi zero, zero, 0 == nop
+	if i.Rd() == Register(0) && i.Rs1() == Register(0) && i.Imm() == 0 {
+		return "nop"
+	}
+
+	return i.opImm.Text()
 }
 
 func (i *instruction) Section() *Section {
@@ -34,51 +306,11 @@ func (i *instruction) Sym() string {
 	return i.sym
 }
 
+func (i *instruction) Mnemonic() string {
+	return i.mnemonic
+}
+
 func (i *instruction) Text() string {
-	if i.raw == 0 {
-		return "unimp"
-	} else if i.raw == 0x13 {
-		// TODO: should be handled as part of the sprinkling of syntactic sugar
-		// addi x0,x0,0 == nop
-		return "nop"
-	}
-
-	switch i.Opcode() {
-	case opcodeLUI: // U-type
-		return fmt.Sprintf("lui %s, %#x", i.Rd(), i.Imm())
-	case opcodeAUIPC: // U-type
-		return fmt.Sprintf("auipc %s, %#x", i.Rd(), i.Imm())
-	case opcodeJAL: // J-type
-		addr := i.target(i.Imm())
-
-		return fmt.Sprintf("jal %08x %s", addr, i.nearestSymbol(addr))
-	case opcodeJALR: // I-type
-		return fmt.Sprintf("jalr %s, %#x", i.Rs1(), i.Imm())
-	case opcodeBRANCH: // B-type
-		addr := i.target(i.Imm())
-
-		return fmt.Sprintf("%s %s, %s, %08x %s",
-			i.decodeBranch(), i.Rs1(), i.Rs2(), addr, i.nearestSymbol(addr))
-	case opcodeLOAD: // I-type
-		return fmt.Sprintf("%s %s, %s+%#x", i.decodeLoad(), i.Rd(), i.Rs1(), i.Imm())
-	case opcodeSTORE: // S-type
-		return fmt.Sprintf("%s %s+%#x, %s", i.decodeStore(), i.Rs1(), i.Imm(), i.Rs2())
-	case opcodeOP_IMM: // I-type
-		switch i.Func3() {
-		case func3SLLI, func3SRLI:
-			return fmt.Sprintf("%s %s, %s, %#x", i.decodeArith(true), i.Rd(), i.Rs1(), i.shamt())
-		default:
-			return fmt.Sprintf("%s %s, %s, %#x", i.decodeArith(true), i.Rd(), i.Rs1(), i.Imm())
-		}
-	case opcodeOP: // R-type
-		return fmt.Sprintf("%s %s, %s, %s",
-			i.decodeArith(false), i.Rd(), i.Rs1(), i.Rs2())
-	case opcodeSYSTEM: // I-type
-		return fmt.Sprintf("%s", i.decodeSystem())
-	case opcodeMISC_MEM:
-		return fmt.Sprintf("%s", i.decodeMisc())
-	}
-
 	panic(fmt.Sprintf("unknown opcode: %v", i.Opcode()))
 }
 
@@ -122,30 +354,6 @@ func (i *instruction) nearestSymbol(addr uint32) string {
 
 func (i *instruction) target(offset uint32) uint32 {
 	return uint32(int64(i.Addr()) + int64(offset))
-}
-
-func (i *instruction) decodeBranch() string {
-	return i.Func3().Branch()
-}
-
-func (i *instruction) decodeArith(imm bool) string {
-	return i.Func3().Arith(imm, i.Func7() == 0b0100000 && i.Func3() == func3SRAI)
-}
-
-func (i *instruction) decodeLoad() string {
-	return i.Func3().Load()
-}
-
-func (i *instruction) decodeStore() string {
-	return i.Func3().Store()
-}
-
-func (i *instruction) decodeSystem() string {
-	return i.Func3().System(i.Imm())
-}
-
-func (i *instruction) decodeMisc() string {
-	return i.Func3().Misc()
 }
 
 func (i *instruction) shamt() uint8 {

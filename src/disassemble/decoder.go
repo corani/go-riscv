@@ -120,138 +120,229 @@ const (
 	func3CSRRCI Func3 = 0b111
 )
 
-func (f3 Func3) Branch() string {
-	switch f3 {
-	case func3BEQ:
-		return "beq"
-	case func3BNE:
-		return "bne"
-	case func3BLT:
-		return "blt"
-	case func3BGE:
-		return "bge"
-	case func3BLTU:
-		return "bltu"
-	case func3BGEU:
-		return "bgeu"
+func decodeInstruction(section *Section, addr, raw uint32, sym string) Instruction {
+	i := &instruction{
+		section: section,
+		addr:    addr,
+		sym:     sym,
+		raw:     raw,
 	}
 
-	panic(fmt.Sprintf("f3 out of range: %#x", f3))
-}
-
-func (f3 Func3) Load() string {
-	switch f3 {
-	case func3LB:
-		return "lb"
-	case func3LH:
-		return "lh"
-	case func3LW:
-		return "lw"
-	case func3LBU:
-		return "lbu"
-	case func3LHU:
-		return "lhu"
+	if i.raw == 0 {
+		return &Unimp{i}
 	}
 
-	panic(fmt.Sprintf("f3 out of range: %#x", f3))
-}
+	switch i.Opcode() {
+	case opcodeLUI: // U-type
+		i.mnemonic = "lui"
 
-func (f3 Func3) Store() string {
-	switch f3 {
-	case func3SB:
-		return "sb"
-	case func3SH:
-		return "sh"
-	case func3SW:
-		return "sw"
-	}
+		return &Lui{i}
+	case opcodeAUIPC: // U-type
+		i.mnemonic = "auipc"
 
-	panic(fmt.Sprintf("f3 out of range: %#x", f3))
-}
+		return &Auipc{i}
+	case opcodeJAL: // J-type
+		i.mnemonic = "jal"
 
-func (f3 Func3) Arith(imm, alt bool) string {
-	switch {
-	case alt && imm:
-		switch f3 {
-		case func3SRAI:
-			return "srai"
+		return &Jal{i}
+	case opcodeJALR: // I-type
+		i.mnemonic = "jalr"
+
+		return &Jalr{i}
+	case opcodeBRANCH: // B-type
+		switch i.Func3() {
+		case func3BEQ:
+			i.mnemonic = "beq"
+
+			return &Beq{&branch{i}}
+		case func3BNE:
+			i.mnemonic = "bne"
+
+			return &Bne{&branch{i}}
+		case func3BLT:
+			i.mnemonic = "blt"
+
+			return &Blt{&branch{i}}
+		case func3BGE:
+			i.mnemonic = "bge"
+
+			return &Bge{&branch{i}}
+		case func3BLTU:
+			i.mnemonic = "bltu"
+
+			return &Bltu{&branch{i}}
+		case func3BGEU:
+			i.mnemonic = "bgeu"
+
+			return &Bgeu{&branch{i}}
 		}
-	case alt:
-		switch f3 {
-		case func3SUB:
-			return "sub"
-		case func3SRA:
-			return "sra"
+	case opcodeLOAD: // I-type
+		switch i.Func3() {
+		case func3LB:
+			i.mnemonic = "lb"
+
+			return &Lb{&load{i}}
+		case func3LH:
+			i.mnemonic = "lh"
+
+			return &Lh{&load{i}}
+		case func3LW:
+			i.mnemonic = "lw"
+
+			return &Lw{&load{i}}
+		case func3LBU:
+			i.mnemonic = "lbu"
+
+			return &Lbu{&load{i}}
+		case func3LHU:
+			i.mnemonic = "lhu"
+
+			return &Lhu{&load{i}}
 		}
-	case imm:
-		switch f3 {
+	case opcodeSTORE: // S-type
+		switch i.Func3() {
+		case func3SB:
+			i.mnemonic = "sb"
+
+			return &Sb{&store{i}}
+		case func3SH:
+			i.mnemonic = "sh"
+
+			return &Sh{&store{i}}
+		case func3SW:
+			i.mnemonic = "sw"
+
+			return &Sw{&store{i}}
+		}
+	case opcodeSYSTEM: // I-type
+		switch i.Func3() {
+		case func3ECALL: // or func3EBREAK
+			if i.Imm()>>20 == 1 {
+				i.mnemonic = "ebreak"
+
+				return &Ebreak{&system{i}}
+			}
+
+			i.mnemonic = "ecall"
+
+			return &Ecall{&system{i}}
+		case func3CSRRW:
+			i.mnemonic = "csrrw"
+
+			return &Csrrw{&system{i}}
+		case func3CSRRS:
+			i.mnemonic = "csrrs"
+
+			return &Csrrs{&system{i}}
+		case func3CSRRC:
+			i.mnemonic = "scrrc"
+
+			return &Csrrc{&system{i}}
+		case func3CSRRWI:
+			i.mnemonic = "csrrwi"
+
+			return &Csrrwi{&system{i}}
+		case func3CSRRSI:
+			i.mnemonic = "csrrsi"
+
+			return &Csrrsi{&system{i}}
+		case func3CSRRCI:
+			i.mnemonic = "csrrci"
+
+			return &Csrrci{&system{i}}
+		}
+	case opcodeMISC_MEM:
+		switch i.Func3() {
+		case func3FENCE:
+			i.mnemonic = "fence"
+
+			return &Fence{i}
+		}
+	case opcodeOP_IMM: // I-type
+		if i.Func7() == 0b0100000 && i.Func3() == func3SRAI {
+			switch i.Func3() {
+			case func3SRAI:
+				i.mnemonic = "srai"
+
+				return &Srai{&opImm{i}}
+			}
+		}
+
+		switch i.Func3() {
 		case func3ADDI:
-			return "addi"
+			i.mnemonic = "addi"
+
+			return &Addi{&opImm{i}}
 		case func3SLTUI:
-			return "sltui"
+			i.mnemonic = "sltui"
+
+			return &Sltui{&opImm{i}}
 		case func3XORI:
-			return "xori"
+			i.mnemonic = "xori"
+
+			return &Xori{&opImm{i}}
 		case func3SLLI:
-			return "slli"
+			i.mnemonic = "slli"
+
+			return &Slli{&opImm{i}}
 		case func3SRLI:
-			return "srli"
+			i.mnemonic = "srli"
+
+			return &Srli{&opImm{i}}
 		case func3ORI:
-			return "ori"
+			i.mnemonic = "ori"
+
+			return &Ori{&opImm{i}}
 		case func3ANDI:
-			return "andi"
+			i.mnemonic = "andi"
+
+			return &Andi{&opImm{i}}
 		}
-	default:
-		switch f3 {
+	case opcodeOP: // R-type
+		if i.Func7() == 0b0100000 {
+			switch i.Func3() {
+			case func3SUB:
+				i.mnemonic = "sub"
+
+				return &Sub{&opReg{i}}
+			case func3SRA:
+				i.mnemonic = "sra"
+
+				return &Sra{&opReg{i}}
+			}
+		}
+
+		switch i.Func3() {
 		case func3ADD: // 000
-			return "add"
+			i.mnemonic = "add"
+
+			return &Add{&opReg{i}}
 		case func3SLT: // 010
-			return "slt"
+			i.mnemonic = "slt"
+
+			return &Slt{&opReg{i}}
 		case func3SLTU: // 011
-			return "sltu"
+			i.mnemonic = "sltu"
+
+			return &Sltu{&opReg{i}}
 		case func3XOR: // 100
-			return "xor"
+			i.mnemonic = "xor"
+
+			return &Xor{&opReg{i}}
 		case func3SRL: // 101
-			return "srl"
+			i.mnemonic = "srl"
+
+			return &Srl{&opReg{i}}
 		case func3OR: // 110
-			return "or"
+			i.mnemonic = "or"
+
+			return &Or{&opReg{i}}
 		case func3AND: // 111
-			return "and"
+			i.mnemonic = "and"
+
+			return &And{&opReg{i}}
 		}
 	}
 
-	panic(fmt.Sprintf("f3 out of range: %#x", f3))
-}
-
-func (f3 Func3) Misc() string {
-	switch f3 {
-	case func3FENCE:
-		return "fence"
-	}
-
-	panic(fmt.Sprintf("f3 out of range: %#x", f3))
-}
-
-func (f3 Func3) System(imm uint32) string {
-	switch f3 {
-	case func3ECALL: // or func3EBREAK
-		if imm>>20 == 1 {
-			return "ebreak"
-		}
-
-		return "ecall"
-	case func3CSRRW:
-		return "csrrw"
-	case func3CSRRS:
-		return "csrrs"
-	case func3CSRRC:
-		return "scrrc"
-	case func3CSRRWI:
-		return "csrrwi"
-	case func3CSRRSI:
-		return "csrrsi"
-	case func3CSRRCI:
-		return "csrrci"
-	}
-
-	panic(fmt.Sprintf("f3 out of range: %#x", f3))
+	return i
 }
