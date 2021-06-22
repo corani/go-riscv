@@ -34,28 +34,23 @@ func (o Opcode) decodeImm(raw uint32) uint32 {
 		return x
 	}
 
-	imm_b := sign_extend(bits(32, 31)<<12|bits(30, 25)<<5|bits(11, 8)<<1|bits(8, 7)<<11, 13)
-	imm_i := sign_extend(bits(31, 20), 12)
-	imm_j := sign_extend(bits(32, 31)<<20|bits(30, 21)<<1|bits(21, 20)<<11|bits(19, 12)<<12, 21)
-	imm_s := sign_extend(bits(31, 25)<<5|bits(11, 7), 12)
-	imm_u := sign_extend(bits(31, 12), 32)
-
+	// TODO: as all immediates are sign-extended, should we return them as a `int32` instead?
 	switch o {
 	case opcodeLUI, opcodeAUIPC:
 		// U-type
-		return imm_u
+		return sign_extend(bits(31, 12), 32)
 	case opcodeJAL:
 		// J-type
-		return imm_j
+		return sign_extend(bits(32, 31)<<20|bits(30, 21)<<1|bits(21, 20)<<11|bits(19, 12)<<12, 21)
 	case opcodeBRANCH:
 		// B-type
-		return imm_b
+		return sign_extend(bits(32, 31)<<12|bits(30, 25)<<5|bits(11, 8)<<1|bits(8, 7)<<11, 13)
 	case opcodeSTORE:
 		// S-type
-		return imm_s
+		return sign_extend(bits(31, 25)<<5|bits(11, 7), 12)
 	case opcodeJALR, opcodeLOAD, opcodeOP_IMM, opcodeSYSTEM:
 		// I-type
-		return imm_i
+		return sign_extend(bits(31, 20), 12)
 	case opcodeOP, opcodeMISC_MEM:
 		// No immediate value
 		return 0
@@ -128,221 +123,142 @@ func decodeInstruction(section *Section, addr, raw uint32, sym string) Instructi
 		raw:     raw,
 	}
 
-	if i.raw == 0 {
-		return &Unimp{i}
+	set := func(i *instruction, m string) *instruction {
+		i.mnemonic = m
+
+		return i
 	}
 
+	branch := func(i *instruction, m string) *Branch { return &Branch{set(i, m)} }
+	load := func(i *instruction, m string) *Load { return &Load{set(i, m)} }
+	store := func(i *instruction, m string) *Store { return &Store{set(i, m)} }
+	system := func(i *instruction, m string) *System { return &System{set(i, m)} }
+	opImm := func(i *instruction, m string) *OpImm { return &OpImm{set(i, m)} }
+	opReg := func(i *instruction, m string) *OpReg { return &OpReg{set(i, m)} }
+
 	switch i.Opcode() {
-	case opcodeLUI: // U-type
-		i.mnemonic = "lui"
-
-		return &Lui{i}
-	case opcodeAUIPC: // U-type
-		i.mnemonic = "auipc"
-
-		return &Auipc{i}
-	case opcodeJAL: // J-type
-		i.mnemonic = "jal"
-
-		return &Jal{i}
-	case opcodeJALR: // I-type
-		i.mnemonic = "jalr"
-
-		return &Jalr{i}
-	case opcodeBRANCH: // B-type
+	case opcodeLUI:
+		return &Lui{set(i, "lui")}
+	case opcodeAUIPC:
+		return &Auipc{set(i, "auipc")}
+	case opcodeJAL:
+		return &Jal{set(i, "jal")}
+	case opcodeJALR:
+		return &Jalr{set(i, "jalr")}
+	case opcodeBRANCH:
 		switch i.Func3() {
 		case func3BEQ:
-			i.mnemonic = "beq"
-
-			return &Beq{&branch{i}}
+			return &Beq{branch(i, "beq")}
 		case func3BNE:
-			i.mnemonic = "bne"
-
-			return &Bne{&branch{i}}
+			return &Bne{branch(i, "bne")}
 		case func3BLT:
-			i.mnemonic = "blt"
-
-			return &Blt{&branch{i}}
+			return &Blt{branch(i, "blt")}
 		case func3BGE:
-			i.mnemonic = "bge"
-
-			return &Bge{&branch{i}}
+			return &Bge{branch(i, "bge")}
 		case func3BLTU:
-			i.mnemonic = "bltu"
-
-			return &Bltu{&branch{i}}
+			return &Bltu{branch(i, "bltu")}
 		case func3BGEU:
-			i.mnemonic = "bgeu"
-
-			return &Bgeu{&branch{i}}
+			return &Bgeu{branch(i, "bgeu")}
 		}
-	case opcodeLOAD: // I-type
+	case opcodeLOAD:
 		switch i.Func3() {
 		case func3LB:
-			i.mnemonic = "lb"
-
-			return &Lb{&load{i}}
+			return &Lb{load(i, "lb")}
 		case func3LH:
-			i.mnemonic = "lh"
-
-			return &Lh{&load{i}}
+			return &Lh{load(i, "lh")}
 		case func3LW:
-			i.mnemonic = "lw"
-
-			return &Lw{&load{i}}
+			return &Lw{load(i, "lw")}
 		case func3LBU:
-			i.mnemonic = "lbu"
-
-			return &Lbu{&load{i}}
+			return &Lbu{load(i, "lbu")}
 		case func3LHU:
-			i.mnemonic = "lhu"
-
-			return &Lhu{&load{i}}
+			return &Lhu{load(i, "lhu")}
 		}
-	case opcodeSTORE: // S-type
+	case opcodeSTORE:
 		switch i.Func3() {
 		case func3SB:
-			i.mnemonic = "sb"
-
-			return &Sb{&store{i}}
+			return &Sb{store(i, "sb")}
 		case func3SH:
-			i.mnemonic = "sh"
-
-			return &Sh{&store{i}}
+			return &Sh{store(i, "sh")}
 		case func3SW:
-			i.mnemonic = "sw"
-
-			return &Sw{&store{i}}
+			return &Sw{store(i, "sw")}
 		}
-	case opcodeSYSTEM: // I-type
+	case opcodeSYSTEM:
 		switch i.Func3() {
-		case func3ECALL: // or func3EBREAK
+		case func3ECALL:
 			if i.Imm()>>20 == 1 {
-				i.mnemonic = "ebreak"
-
-				return &Ebreak{&system{i}}
+				return &Ebreak{system(i, "ebreak")}
 			}
 
-			i.mnemonic = "ecall"
-
-			return &Ecall{&system{i}}
+			return &Ecall{system(i, "ecall")}
 		case func3CSRRW:
-			i.mnemonic = "csrrw"
-
-			return &Csrrw{&system{i}}
+			return &Csrrw{system(i, "csrrw")}
 		case func3CSRRS:
-			i.mnemonic = "csrrs"
-
-			return &Csrrs{&system{i}}
+			return &Csrrs{system(i, "csrrs")}
 		case func3CSRRC:
-			i.mnemonic = "scrrc"
-
-			return &Csrrc{&system{i}}
+			return &Csrrc{system(i, "csrrc")}
 		case func3CSRRWI:
-			i.mnemonic = "csrrwi"
-
-			return &Csrrwi{&system{i}}
+			return &Csrrwi{system(i, "csrrwi")}
 		case func3CSRRSI:
-			i.mnemonic = "csrrsi"
-
-			return &Csrrsi{&system{i}}
+			return &Csrrsi{system(i, "csrrsi")}
 		case func3CSRRCI:
-			i.mnemonic = "csrrci"
-
-			return &Csrrci{&system{i}}
+			return &Csrrci{system(i, "csrrci")}
 		}
 	case opcodeMISC_MEM:
 		switch i.Func3() {
 		case func3FENCE:
-			i.mnemonic = "fence"
-
-			return &Fence{i}
+			return &Fence{set(i, "fence")}
 		}
-	case opcodeOP_IMM: // I-type
+	case opcodeOP_IMM:
 		if i.Func7() == 0b0100000 && i.Func3() == func3SRAI {
 			switch i.Func3() {
 			case func3SRAI:
-				i.mnemonic = "srai"
-
-				return &Srai{&opImm{i}}
+				return &Srai{opImm(i, "srai")}
 			}
 		}
 
 		switch i.Func3() {
 		case func3ADDI:
-			i.mnemonic = "addi"
-
-			return &Addi{&opImm{i}}
+			return &Addi{opImm(i, "addi")}
 		case func3SLTUI:
-			i.mnemonic = "sltui"
-
-			return &Sltui{&opImm{i}}
+			return &Sltui{opImm(i, "sltui")}
 		case func3XORI:
-			i.mnemonic = "xori"
-
-			return &Xori{&opImm{i}}
+			return &Xori{opImm(i, "xori")}
 		case func3SLLI:
-			i.mnemonic = "slli"
-
-			return &Slli{&opImm{i}}
+			return &Slli{opImm(i, "slli")}
 		case func3SRLI:
-			i.mnemonic = "srli"
-
-			return &Srli{&opImm{i}}
+			return &Srli{opImm(i, "srli")}
 		case func3ORI:
-			i.mnemonic = "ori"
-
-			return &Ori{&opImm{i}}
+			return &Ori{opImm(i, "ori")}
 		case func3ANDI:
-			i.mnemonic = "andi"
-
-			return &Andi{&opImm{i}}
+			return &Andi{opImm(i, "andi")}
 		}
-	case opcodeOP: // R-type
+	case opcodeOP:
 		if i.Func7() == 0b0100000 {
 			switch i.Func3() {
 			case func3SUB:
-				i.mnemonic = "sub"
-
-				return &Sub{&opReg{i}}
+				return &Sub{opReg(i, "sub")}
 			case func3SRA:
-				i.mnemonic = "sra"
-
-				return &Sra{&opReg{i}}
+				return &Sra{opReg(i, "sra")}
 			}
 		}
 
 		switch i.Func3() {
 		case func3ADD: // 000
-			i.mnemonic = "add"
-
-			return &Add{&opReg{i}}
+			return &Add{opReg(i, "add")}
 		case func3SLT: // 010
-			i.mnemonic = "slt"
-
-			return &Slt{&opReg{i}}
+			return &Slt{opReg(i, "slt")}
 		case func3SLTU: // 011
-			i.mnemonic = "sltu"
-
-			return &Sltu{&opReg{i}}
+			return &Sltu{opReg(i, "sltu")}
 		case func3XOR: // 100
-			i.mnemonic = "xor"
-
-			return &Xor{&opReg{i}}
+			return &Xor{opReg(i, "xor")}
 		case func3SRL: // 101
-			i.mnemonic = "srl"
-
-			return &Srl{&opReg{i}}
+			return &Srl{opReg(i, "srl")}
 		case func3OR: // 110
-			i.mnemonic = "or"
-
-			return &Or{&opReg{i}}
+			return &Or{opReg(i, "or")}
 		case func3AND: // 111
-			i.mnemonic = "and"
-
-			return &And{&opReg{i}}
+			return &And{opReg(i, "and")}
 		}
 	}
 
-	return i
+	return &Unimp{set(i, "unimp")}
 }
