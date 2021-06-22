@@ -220,7 +220,7 @@ func decodeInstruction(section *Section, addr, raw uint32, sym string) Instructi
 		case func3ADDI:
 			return &Addi{opImm(i, "addi")}
 		case func3SLTUI:
-			return &Sltui{opImm(i, "sltui")}
+			return &Sltiu{opImm(i, "sltiu")}
 		case func3XORI:
 			return &Xori{opImm(i, "xori")}
 		case func3SLLI:

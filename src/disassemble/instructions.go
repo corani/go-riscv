@@ -100,7 +100,7 @@ type Srai struct{ *OpImm }
 
 type Addi struct{ *OpImm }
 
-type Sltui struct{ *OpImm }
+type Sltiu struct{ *OpImm }
 
 type Xori struct{ *OpImm }
 
@@ -122,12 +122,12 @@ func (i *Unimp) Text() string {
 }
 
 func (i *Lui) Text() string {
-	return fmt.Sprintf("%s %s, %#x",
+	return fmt.Sprintf("%-4s %s, %#x",
 		i.Mnemonic(), i.Rd(), i.Imm())
 }
 
 func (i *Auipc) Text() string {
-	return fmt.Sprintf("%s %s, %#x",
+	return fmt.Sprintf("%-4s %s, %#x",
 		i.Mnemonic(), i.Rd(), i.Imm())
 }
 
@@ -136,17 +136,17 @@ func (i *Jal) Text() string {
 
 	// Syntactic Sugar: jal zero, offset == j offset
 	if i.Rd() == Register(0) {
-		return fmt.Sprintf("j %08x %s",
+		return fmt.Sprintf("j    %08x %s",
 			addr, i.nearestSymbol(addr))
 	}
 
 	// Syntactic Sugar: jal x1, offset == jal offset
 	if i.Rd() == Register(1) {
-		return fmt.Sprintf("%s %08x %s",
+		return fmt.Sprintf("%-4s %08x %s",
 			i.Mnemonic(), addr, i.nearestSymbol(addr))
 	}
 
-	return fmt.Sprintf("%s %s, %08x %s",
+	return fmt.Sprintf("%-4s %s, %08x %s",
 		i.Mnemonic(), i.Rd(), addr, i.nearestSymbol(addr))
 }
 
@@ -157,22 +157,22 @@ func (i *Jalr) Text() string {
 		}
 
 		if i.Rd() == Register(0) {
-			return fmt.Sprintf("jr %s", i.Rs1())
+			return fmt.Sprintf("jr   %s", i.Rs1())
 		}
 
 		if i.Rd() == Register(1) {
-			return fmt.Sprintf("%s %s", i.Mnemonic(), i.Rs1())
+			return fmt.Sprintf("%-4s %s", i.Mnemonic(), i.Rs1())
 		}
 	}
 
-	return fmt.Sprintf("%s %s, %d(%s)",
+	return fmt.Sprintf("%-4s %s, %d(%s)",
 		i.Mnemonic(), i.Rd(), i.Imm(), i.Rs1())
 }
 
 func (i *Branch) Text() string {
 	addr := i.target(i.Imm())
 
-	return fmt.Sprintf("%s %s, %s, %08x %s",
+	return fmt.Sprintf("%-4s %s, %s, %08x %s",
 		i.Mnemonic(), i.Rs1(), i.Rs2(), addr, i.nearestSymbol(addr))
 }
 
@@ -235,13 +235,13 @@ func (i *Bge) Text() string {
 }
 
 func (i *Load) Text() string {
-	return fmt.Sprintf("%s %s, %s+%#x",
+	return fmt.Sprintf("%-4s %s, %s+%#x",
 		i.Mnemonic(), i.Rd(), i.Rs1(), i.Imm())
 }
 
 func (i *Store) Text() string {
-	return fmt.Sprintf("%s %s+%#x, %s",
-		i.Mnemonic(), i.Rs1(), i.Imm(), i.Rs2())
+	return fmt.Sprintf("%-4s %s, %d(%s)",
+		i.Mnemonic(), i.Rs2(), int32(i.Imm()), i.Rs1())
 }
 
 func (i *Fence) Text() string {
@@ -253,13 +253,33 @@ func (i *System) Text() string {
 }
 
 func (i *OpReg) Text() string {
-	return fmt.Sprintf("%s %s, %s, %s",
+	return fmt.Sprintf("%-4s %s, %s, %s",
 		i.Mnemonic(), i.Rd(), i.Rs1(), i.Rs2())
 }
 
 func (i *Sub) Text() string {
 	if i.Rs1() == Register(0) {
-		return fmt.Sprintf("neg %s, %s", i.Rd(), i.Rs2())
+		return fmt.Sprintf("neg  %s, %s", i.Rd(), i.Rs2())
+	}
+
+	return i.OpReg.Text()
+}
+
+func (i *Slt) Text() string {
+	if i.Rs1() == Register(0) {
+		return fmt.Sprintf("sgtz %s, %s", i.Rd(), i.Rs2())
+	}
+
+	if i.Rs2() == Register(0) {
+		return fmt.Sprintf("sltz %s, %s", i.Rd(), i.Rs1())
+	}
+
+	return i.OpReg.Text()
+}
+
+func (i *Sltu) Text() string {
+	if i.Rs1() == Register(0) {
+		return fmt.Sprintf("snez %s, %s", i.Rd(), i.Rs2())
 	}
 
 	return i.OpReg.Text()
@@ -268,36 +288,41 @@ func (i *Sub) Text() string {
 func (i *OpImm) Text() string {
 	switch i.Func3() {
 	case func3SLLI, func3SRLI:
-		return fmt.Sprintf("%s %s, %s, %#x",
+		return fmt.Sprintf("%-4s %s, %s, %#x",
 			i.Mnemonic(), i.Rd(), i.Rs1(), i.shamt())
 	default:
-		return fmt.Sprintf("%s %s, %s, %d",
+		return fmt.Sprintf("%-4s %s, %s, %d",
 			i.Mnemonic(), i.Rd(), i.Rs1(), int32(i.Imm()))
 	}
 }
 
 func (i *Xori) Text() string {
 	if int32(i.Imm()) == -1 {
-		return fmt.Sprintf("not %s, %s", i.Rd(), i.Rs1())
+		return fmt.Sprintf("not  %s, %s", i.Rd(), i.Rs1())
 	}
 
 	return i.OpImm.Text()
 }
 
 func (i *Addi) Text() string {
-	// Syntactic sugar: addi zero, zero, 0 == nop
 	if i.Rd() == Register(0) && i.Rs1() == Register(0) && i.Imm() == 0 {
 		return "nop"
 	}
 
-	// Syntactic sugar: addi reg, zero, imm == li reg, imm
 	if i.Rs1() == Register(0) {
-		return fmt.Sprintf("li %s, %d", i.Rd(), i.Imm())
+		return fmt.Sprintf("li   %s, %d", i.Rd(), i.Imm())
 	}
 
-	// Syntactic sugar: addi reg1, reg2, 0 == mv reg1, reg2
 	if i.Imm() == 0 {
-		return fmt.Sprintf("mv %s, %s", i.Rd(), i.Rs1())
+		return fmt.Sprintf("mv   %s, %s", i.Rd(), i.Rs1())
+	}
+
+	return i.OpImm.Text()
+}
+
+func (i *Sltiu) Text() string {
+	if i.Imm() == 1 {
+		return fmt.Sprintf("seqz %s, %s", i.Rd(), i.Rs1())
 	}
 
 	return i.OpImm.Text()
