@@ -11,11 +11,11 @@ func listProgram(program *Program) {
 
 		r := s.Reader()
 		for inst := r.Next(); inst != nil; inst = r.Next() {
-			if inst.sym != "" {
-				fmt.Printf("\n%08x <%s>:\n", inst.addr, inst.sym)
+			if inst.Sym() != "" {
+				fmt.Printf("\n%08x <%s>:\n", inst.Addr(), inst.Sym())
 			}
 
-			fmt.Printf("%08x:       %08x        %s\n", inst.addr, inst.raw, inst.text)
+			fmt.Printf("%08x:       %08x        %s\n", inst.Addr(), inst.Raw(), inst.Text())
 		}
 	}
 }

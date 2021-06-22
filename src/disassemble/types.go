@@ -25,11 +25,11 @@ type SectionReader struct {
 	index   uint32
 }
 
-type Instruction struct {
-	addr uint32
-	raw  uint32
-	sym  string
-	text string
+type Instruction interface {
+	Addr() uint32
+	Raw() uint32
+	Sym() string
+	Text() string
 }
 
 func (s Section) SymbolAtAddr(addr uint32) (string, bool) {
@@ -73,7 +73,7 @@ func (s Section) Reader() *SectionReader {
 	}
 }
 
-func (r *SectionReader) Next() *Instruction {
+func (r *SectionReader) Next() Instruction {
 	if int(r.index) >= len(r.section.data) {
 		return nil
 	}
@@ -82,7 +82,7 @@ func (r *SectionReader) Next() *Instruction {
 	addr := r.section.AddrForIndex(r.index)
 	raw := r.section.data[r.index]
 
-	inst := Instruction{
+	inst := &instruction{
 		addr: addr,
 		sym:  sym,
 		raw:  raw,
@@ -91,5 +91,5 @@ func (r *SectionReader) Next() *Instruction {
 
 	r.index++
 
-	return &inst
+	return inst
 }
