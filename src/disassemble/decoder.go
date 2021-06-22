@@ -105,7 +105,10 @@ const (
 	func3EBREAK Func3 = 0b000
 
 	// System
-	func3FENCE  Func3 = 0b000
+	func3FENCE Func3 = 0b000
+	// System: Zifencei extension
+	func3FENCEI Func3 = 0b001
+	// System: Zicsr extension
 	func3CSRRW  Func3 = 0b001
 	func3CSRRS  Func3 = 0b010
 	func3CSRRC  Func3 = 0b011
@@ -131,6 +134,7 @@ func decodeInstruction(section *Section, addr, raw uint32, sym string) Instructi
 	branch := func(i *instruction, m string) *Branch { return &Branch{set(i, m)} }
 	load := func(i *instruction, m string) *Load { return &Load{set(i, m)} }
 	store := func(i *instruction, m string) *Store { return &Store{set(i, m)} }
+	misc := func(i *instruction, m string) *Misc { return &Misc{set(i, m)} }
 	system := func(i *instruction, m string) *System { return &System{set(i, m)} }
 	opImm := func(i *instruction, m string) *OpImm { return &OpImm{set(i, m)} }
 	opReg := func(i *instruction, m string) *OpReg { return &OpReg{set(i, m)} }
@@ -205,7 +209,9 @@ func decodeInstruction(section *Section, addr, raw uint32, sym string) Instructi
 	case opcodeMISC_MEM:
 		switch i.Func3() {
 		case func3FENCE:
-			return &Fence{set(i, "fence")}
+			return &Fence{misc(i, "fence")}
+		case func3FENCEI:
+			return &Fencei{misc(i, "fence.i")}
 		}
 	case opcodeOP_IMM:
 		if i.Func7() == 0b0100000 && i.Func3() == func3SRAI {

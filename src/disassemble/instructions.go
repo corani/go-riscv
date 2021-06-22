@@ -21,95 +21,58 @@ type Jal struct{ *instruction }
 type Jalr struct{ *instruction }
 
 type Branch struct{ *instruction }
-
 type Beq struct{ *Branch }
-
 type Bne struct{ *Branch }
-
 type Blt struct{ *Branch }
-
 type Bge struct{ *Branch }
-
 type Bltu struct{ *Branch }
-
 type Bgeu struct{ *Branch }
 
 type Load struct{ *instruction }
-
 type Lb struct{ *Load }
-
 type Lh struct{ *Load }
-
 type Lw struct{ *Load }
-
 type Lbu struct{ *Load }
-
 type Lhu struct{ *Load }
 
 type Store struct{ *instruction }
-
 type Sb struct{ *Store }
-
 type Sh struct{ *Store }
-
 type Sw struct{ *Store }
 
-type Fence struct{ *instruction }
+type Misc struct{ *instruction }
+type Fence struct{ *Misc }
+type Fencei struct{ *Misc }
 
 type System struct{ *instruction }
-
 type Ebreak struct{ *System }
-
 type Ecall struct{ *System }
-
 type Csrrw struct{ *System }
-
 type Csrrs struct{ *System }
-
 type Csrrc struct{ *System }
-
 type Csrrwi struct{ *System }
-
 type Csrrsi struct{ *System }
-
 type Csrrci struct{ *System }
 
 type OpReg struct{ *instruction }
-
 type Sub struct{ *OpReg }
-
 type Sra struct{ *OpReg }
-
 type Add struct{ *OpReg }
-
 type Slt struct{ *OpReg }
-
 type Sltu struct{ *OpReg }
-
 type Xor struct{ *OpReg }
-
 type Srl struct{ *OpReg }
-
 type Or struct{ *OpReg }
-
 type And struct{ *OpReg }
 
 type OpImm struct{ *instruction }
-
 type Srai struct{ *OpImm }
-
 type Addi struct{ *OpImm }
-
 type Sltiu struct{ *OpImm }
-
 type Xori struct{ *OpImm }
-
 type Slli struct{ *OpImm }
-
 type Srli struct{ *OpImm }
-
 type Ori struct{ *OpImm }
-
 type Andi struct{ *OpImm }
 
 func (i *Unimp) Text() string {
@@ -244,7 +207,7 @@ func (i *Store) Text() string {
 		i.Mnemonic(), i.Rs2(), i.Imm(), i.Rs1())
 }
 
-func (i *Fence) Text() string {
+func (i *Misc) Text() string {
 	return i.Mnemonic()
 }
 
