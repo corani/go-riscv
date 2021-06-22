@@ -83,10 +83,10 @@ func (r *SectionReader) Next() Instruction {
 	raw := r.section.data[r.index]
 
 	inst := &instruction{
-		addr: addr,
-		sym:  sym,
-		raw:  raw,
-		text: decode(r.section, addr, raw),
+		section: r.section,
+		addr:    addr,
+		sym:     sym,
+		raw:     raw,
 	}
 
 	r.index++
