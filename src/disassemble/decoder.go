@@ -20,7 +20,7 @@ const (
 	opcodeSYSTEM   Opcode = 0b01110011
 )
 
-func (o Opcode) decodeImm(raw uint32) uint32 {
+func (o Opcode) decodeImm(raw uint32) int32 {
 	// bits gets the bits [s..e] from raw (shifted down)
 	bits := func(s, e int) uint32 {
 		return (raw >> e) & ((1 << (s - e + 1)) - 1)
@@ -34,23 +34,22 @@ func (o Opcode) decodeImm(raw uint32) uint32 {
 		return x
 	}
 
-	// TODO: as all immediates are sign-extended, should we return them as a `int32` instead?
 	switch o {
 	case opcodeLUI, opcodeAUIPC:
 		// U-type
-		return sign_extend(bits(31, 12), 32)
+		return int32(sign_extend(bits(31, 12), 32))
 	case opcodeJAL:
 		// J-type
-		return sign_extend(bits(32, 31)<<20|bits(30, 21)<<1|bits(21, 20)<<11|bits(19, 12)<<12, 21)
+		return int32(sign_extend(bits(32, 31)<<20|bits(30, 21)<<1|bits(21, 20)<<11|bits(19, 12)<<12, 21))
 	case opcodeBRANCH:
 		// B-type
-		return sign_extend(bits(32, 31)<<12|bits(30, 25)<<5|bits(11, 8)<<1|bits(8, 7)<<11, 13)
+		return int32(sign_extend(bits(32, 31)<<12|bits(30, 25)<<5|bits(11, 8)<<1|bits(8, 7)<<11, 13))
 	case opcodeSTORE:
 		// S-type
-		return sign_extend(bits(31, 25)<<5|bits(11, 7), 12)
+		return int32(sign_extend(bits(31, 25)<<5|bits(11, 7), 12))
 	case opcodeJALR, opcodeLOAD, opcodeOP_IMM, opcodeSYSTEM:
 		// I-type
-		return sign_extend(bits(31, 20), 12)
+		return int32(sign_extend(bits(31, 20), 12))
 	case opcodeOP, opcodeMISC_MEM:
 		// No immediate value
 		return 0
@@ -185,7 +184,7 @@ func decodeInstruction(section *Section, addr, raw uint32, sym string) Instructi
 	case opcodeSYSTEM:
 		switch i.Func3() {
 		case func3ECALL:
-			if i.Imm()>>20 == 1 {
+			if i.bits(31, 20) == 1 {
 				return &Ebreak{system(i, "ebreak")}
 			}
 
@@ -243,19 +242,19 @@ func decodeInstruction(section *Section, addr, raw uint32, sym string) Instructi
 		}
 
 		switch i.Func3() {
-		case func3ADD: // 000
+		case func3ADD:
 			return &Add{opReg(i, "add")}
-		case func3SLT: // 010
+		case func3SLT:
 			return &Slt{opReg(i, "slt")}
-		case func3SLTU: // 011
+		case func3SLTU:
 			return &Sltu{opReg(i, "sltu")}
-		case func3XOR: // 100
+		case func3XOR:
 			return &Xor{opReg(i, "xor")}
-		case func3SRL: // 101
+		case func3SRL:
 			return &Srl{opReg(i, "srl")}
-		case func3OR: // 110
+		case func3OR:
 			return &Or{opReg(i, "or")}
-		case func3AND: // 111
+		case func3AND:
 			return &And{opReg(i, "and")}
 		}
 	}

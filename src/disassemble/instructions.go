@@ -241,7 +241,7 @@ func (i *Load) Text() string {
 
 func (i *Store) Text() string {
 	return fmt.Sprintf("%-4s %s, %d(%s)",
-		i.Mnemonic(), i.Rs2(), int32(i.Imm()), i.Rs1())
+		i.Mnemonic(), i.Rs2(), i.Imm(), i.Rs1())
 }
 
 func (i *Fence) Text() string {
@@ -292,12 +292,12 @@ func (i *OpImm) Text() string {
 			i.Mnemonic(), i.Rd(), i.Rs1(), i.shamt())
 	default:
 		return fmt.Sprintf("%-4s %s, %s, %d",
-			i.Mnemonic(), i.Rd(), i.Rs1(), int32(i.Imm()))
+			i.Mnemonic(), i.Rd(), i.Rs1(), i.Imm())
 	}
 }
 
 func (i *Xori) Text() string {
-	if int32(i.Imm()) == -1 {
+	if i.Imm() == -1 {
 		return fmt.Sprintf("not  %s, %s", i.Rd(), i.Rs1())
 	}
 
@@ -352,7 +352,7 @@ func (i *instruction) Opcode() Opcode {
 	return Opcode(i.bits(6, 0))
 }
 
-func (i *instruction) Imm() uint32 {
+func (i *instruction) Imm() int32 {
 	opcode := i.Opcode()
 
 	return opcode.decodeImm(i.raw)
@@ -386,7 +386,7 @@ func (i *instruction) nearestSymbol(addr uint32) string {
 	return i.section.NearestSymbol(addr)
 }
 
-func (i *instruction) target(offset uint32) uint32 {
+func (i *instruction) target(offset int32) uint32 {
 	return uint32(int64(i.Addr()) + int64(offset))
 }
 
