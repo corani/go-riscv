@@ -211,8 +211,75 @@ func (i *Misc) Text() string {
 	return i.Mnemonic()
 }
 
+func (i *System) Csr() string {
+	return CsrName(uint32(i.Imm()))
+}
+
+func (i *System) Uimm() uint8 {
+	return uint8(i.bits(19, 15))
+}
+
 func (i *System) Text() string {
+	switch i.Func3() {
+	case func3CSRRW, func3CSRRS, func3CSRRC:
+		return fmt.Sprintf("%-4s %s, %s, %s", i.Mnemonic(), i.Rd(), i.Csr(), i.Rs1())
+	case func3CSRRWI, func3CSRRSI, func3CSRRCI:
+		return fmt.Sprintf("%-4s %s, %s, %d", i.Mnemonic(), i.Rd(), i.Csr(), i.Uimm())
+	}
+
 	return i.Mnemonic()
+}
+
+func (i *Csrrs) Text() string {
+	if i.Rs1() == Register(0) {
+		return fmt.Sprintf("csrr %s, %s", i.Rd(), i.Csr())
+	}
+
+	if i.Rd() == Register(0) {
+		return fmt.Sprintf("csrs %s, %s", i.Csr(), i.Rs1())
+	}
+
+	return i.System.Text()
+}
+
+func (i *Csrrw) Text() string {
+	if i.Rd() == Register(0) {
+		return fmt.Sprintf("csrw %s, %s", i.Csr(), i.Rs1())
+	}
+
+	return i.System.Text()
+}
+
+func (i *Csrrc) Text() string {
+	if i.Rd() == Register(0) {
+		return fmt.Sprintf("csrc %s, %s", i.Csr(), i.Rs1())
+	}
+
+	return i.System.Text()
+}
+
+func (i *Csrrsi) Text() string {
+	if i.Rd() == Register(0) {
+		return fmt.Sprintf("csrsi %s, %d", i.Csr(), i.Uimm())
+	}
+
+	return i.System.Text()
+}
+
+func (i *Csrrwi) Text() string {
+	if i.Rd() == Register(0) {
+		return fmt.Sprintf("csrwi %s, %d", i.Csr(), i.Uimm())
+	}
+
+	return i.System.Text()
+}
+
+func (i *Csrrci) Text() string {
+	if i.Rd() == Register(0) {
+		return fmt.Sprintf("csrci %s, %d", i.Csr(), i.Uimm())
+	}
+
+	return i.System.Text()
 }
 
 func (i *OpReg) Text() string {
