@@ -20,6 +20,50 @@ const (
 	opcodeSYSTEM   Opcode = 0b01110011
 )
 
+func (o Opcode) decodeImm(raw uint32) uint32 {
+	// bits gets the bits [s..e] from raw (shifted down)
+	bits := func(s, e int) uint32 {
+		return (raw >> e) & ((1 << (s - e + 1)) - 1)
+	}
+
+	sign_extend := func(x uint32, l int) uint32 {
+		if x>>(l-1) == 1 {
+			return -((1 << l) - x)
+		}
+
+		return x
+	}
+
+	imm_b := sign_extend(bits(32, 31)<<12|bits(30, 25)<<5|bits(11, 8)<<1|bits(8, 7)<<11, 13)
+	imm_i := sign_extend(bits(31, 20), 12)
+	imm_j := sign_extend(bits(32, 31)<<20|bits(30, 21)<<1|bits(21, 20)<<11|bits(19, 12)<<12, 21)
+	imm_s := sign_extend(bits(31, 25)<<5|bits(11, 7), 12)
+	imm_u := sign_extend(bits(31, 12), 32)
+
+	switch o {
+	case opcodeLUI, opcodeAUIPC:
+		// U-type
+		return imm_u
+	case opcodeJAL:
+		// J-type
+		return imm_j
+	case opcodeBRANCH:
+		// B-type
+		return imm_b
+	case opcodeSTORE:
+		// S-type
+		return imm_s
+	case opcodeJALR, opcodeLOAD, opcodeOP_IMM, opcodeSYSTEM:
+		// I-type
+		return imm_i
+	case opcodeOP, opcodeMISC_MEM:
+		// No immediate value
+		return 0
+	}
+
+	panic(fmt.Sprintf("unknown opcode: %v", o))
+}
+
 type Func3 uint8
 
 const (
@@ -238,6 +282,7 @@ func decode(s *Section, addr, raw uint32) string {
 	if raw == 0 {
 		return "unimp"
 	} else if raw == 0x13 {
+		// TODO: should be handled as part of the syntactic sugar sprinkling
 		// addi x0,x0,0 == nop
 		return "nop"
 	}
@@ -247,20 +292,8 @@ func decode(s *Section, addr, raw uint32) string {
 		return (raw >> e) & ((1 << (s - e + 1)) - 1)
 	}
 
-	sign_extend := func(x uint32, l int) uint32 {
-		if x>>(l-1) == 1 {
-			return -((1 << l) - x)
-		}
-
-		return x
-	}
-
 	opcode := Opcode(bits(6, 0))
-	imm_b := sign_extend(bits(32, 31)<<12|bits(30, 25)<<5|bits(11, 8)<<1|bits(8, 7)<<11, 13)
-	imm_i := sign_extend(bits(31, 20), 12)
-	imm_j := sign_extend(bits(32, 31)<<20|bits(30, 21)<<1|bits(21, 20)<<11|bits(19, 12)<<12, 21)
-	imm_s := sign_extend(bits(31, 25)<<5|bits(11, 7), 12)
-	imm_u := sign_extend(bits(31, 12), 32)
+	imm := opcode.decodeImm(raw)
 
 	// registers
 	rd := Register(bits(11, 7))
@@ -272,46 +305,39 @@ func decode(s *Section, addr, raw uint32) string {
 
 	switch opcode {
 	case opcodeLUI: // U-type
-		return fmt.Sprintf("lui %s, %#x",
-			rd, imm_u)
+		return fmt.Sprintf("lui %s, %#x", rd, imm)
 	case opcodeAUIPC: // U-type
-		return fmt.Sprintf("auipc %s, %#x",
-			rd, imm_u)
+		return fmt.Sprintf("auipc %s, %#x", rd, imm)
 	case opcodeJAL: // J-type
-		return fmt.Sprintf("jal %08x %s",
-			addr+imm_j, s.NearestSymbol(addr+imm_j))
+		return fmt.Sprintf("jal %08x %s", addr+imm,
+			s.NearestSymbol(addr+imm))
 	case opcodeJALR: // I-type
-		return fmt.Sprintf("jalr %s, %#x",
-			rs1, imm_i)
+		return fmt.Sprintf("jalr %s, %#x", rs1, imm)
 	case opcodeBRANCH: // B-type
 		return fmt.Sprintf("%s %s, %s, %08x %s",
-			fn3.Branch(), rs1, rs2, addr+imm_b, s.NearestSymbol(addr+imm_b))
+			fn3.Branch(), rs1, rs2, addr+imm, s.NearestSymbol(addr+imm))
 	case opcodeLOAD: // I-type
-		return fmt.Sprintf("%s %s, %s+%#x",
-			fn3.Load(), rd, rs1, imm_i)
+		return fmt.Sprintf("%s %s, %s+%#x", fn3.Load(), rd, rs1, imm)
 	case opcodeSTORE: // S-type
-		return fmt.Sprintf("%s %s+%#x, %s",
-			fn3.Store(), rs1, imm_s, rs2)
+		return fmt.Sprintf("%s %s+%#x, %s", fn3.Store(), rs1, imm, rs2)
 	case opcodeOP_IMM: // I-type
 		switch fn3 {
 		case func3SLLI, func3SRLI:
-			shamt := imm_i & 0b11111
+			shamt := imm & 0b11111
 			return fmt.Sprintf("%s %s, %s, %#x",
 				fn3.Arith(true, fn7 == 0b0100000 && fn3 == func3SRAI),
 				rd, rs1, shamt)
 		default:
 			return fmt.Sprintf("%s %s, %s, %#x",
-				fn3.Arith(true, false), rd, rs1, imm_i)
+				fn3.Arith(true, false), rd, rs1, imm)
 		}
 	case opcodeOP: // R-type
 		return fmt.Sprintf("%s %s, %s, %s",
 			fn3.Arith(false, fn7 == 0b0100000), rd, rs1, rs2)
 	case opcodeSYSTEM: // I-type
-		return fmt.Sprintf("%s",
-			fn3.System(imm_i))
+		return fmt.Sprintf("%s", fn3.System(imm))
 	case opcodeMISC_MEM:
-		return fmt.Sprintf("%s",
-			fn3.Misc())
+		return fmt.Sprintf("%s", fn3.Misc())
 	}
 
 	panic(fmt.Sprintf("unknown opcode: %v", opcode))
