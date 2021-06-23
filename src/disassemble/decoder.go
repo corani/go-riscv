@@ -66,8 +66,10 @@ const (
 	func3SUB  Func3 = 0b000
 	func3ADDI Func3 = 0b000
 
+	func3SLL   Func3 = 0b001
 	func3SLLI  Func3 = 0b001
 	func3SLT   Func3 = 0b010
+	func3SLTI  Func3 = 0b010
 	func3SLTU  Func3 = 0b011
 	func3SLTUI Func3 = 0b011
 
@@ -188,11 +190,30 @@ func decodeInstruction(section *Section, addr, raw uint32, sym string) Instructi
 	case opcodeSYSTEM:
 		switch i.Func3() {
 		case func3ECALL:
-			if i.bits(31, 20) == 1 {
+			switch {
+			case i.bits(31, 7) == 0:
+				return &Ecall{system(i, "ecall")}
+			case i.bits(19, 7) == 0 && i.bits(31, 20) == 1:
 				return &Ebreak{system(i, "ebreak")}
+				// trap-return instructions
+			case i.bits(19, 7) == 0 && i.bits(31, 20) == 0b000000000010:
+				return &Uret{system(i, "uret")}
+			case i.bits(19, 7) == 0 && i.bits(31, 20) == 0b000100000010:
+				return &Sret{system(i, "sret")}
+			case i.bits(19, 7) == 0 && i.bits(31, 20) == 0b001100000010:
+				return &Mret{system(i, "mret")}
+				// interrupt-management instructions
+			case i.bits(19, 7) == 0 && i.bits(31, 20) == 0b000100000101:
+				return &Wfi{system(i, "wfi")}
+				// supervisor memory-management instructions
+			case i.bits(14, 7) == 0 && i.bits(31, 25) == 0b0001001:
+				return &Sfence{system(i, "sfence.vma")}
+				// hypervisor memory-management instructions
+			case i.bits(14, 7) == 0 && i.bits(31, 25) == 0b0010001:
+				return &Hfence{system(i, "hfence.bvma")}
+			case i.bits(14, 7) == 0 && i.bits(31, 25) == 0b1010001:
+				return &Hfence{system(i, "hfence.gvma")}
 			}
-
-			return &Ecall{system(i, "ecall")}
 		case func3CSRRW:
 			return &Csrrw{system(i, "csrrw")}
 		case func3CSRRS:
@@ -224,6 +245,8 @@ func decodeInstruction(section *Section, addr, raw uint32, sym string) Instructi
 		switch i.Func3() {
 		case func3ADDI:
 			return &Addi{opImm(i, "addi")}
+		case func3SLTI:
+			return &Slti{opImm(i, "slti")}
 		case func3SLTUI:
 			return &Sltiu{opImm(i, "sltiu")}
 		case func3XORI:
@@ -250,6 +273,8 @@ func decodeInstruction(section *Section, addr, raw uint32, sym string) Instructi
 		switch i.Func3() {
 		case func3ADD:
 			return &Add{opReg(i, "add")}
+		case func3SLL:
+			return &Sll{opReg(i, "sll")}
 		case func3SLT:
 			return &Slt{opReg(i, "slt")}
 		case func3SLTU:

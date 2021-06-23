@@ -47,6 +47,12 @@ type Fencei struct{ *Misc }
 type System struct{ *instruction }
 type Ebreak struct{ *System }
 type Ecall struct{ *System }
+type Uret struct{ *System }
+type Sret struct{ *System }
+type Mret struct{ *System }
+type Wfi struct{ *System }
+type Sfence struct{ *System }
+type Hfence struct{ *System }
 type Csrrw struct{ *System }
 type Csrrs struct{ *System }
 type Csrrc struct{ *System }
@@ -58,6 +64,7 @@ type OpReg struct{ *instruction }
 type Sub struct{ *OpReg }
 type Sra struct{ *OpReg }
 type Add struct{ *OpReg }
+type Sll struct{ *OpReg }
 type Slt struct{ *OpReg }
 type Sltu struct{ *OpReg }
 type Xor struct{ *OpReg }
@@ -68,6 +75,7 @@ type And struct{ *OpReg }
 type OpImm struct{ *instruction }
 type Srai struct{ *OpImm }
 type Addi struct{ *OpImm }
+type Slti struct{ *OpImm }
 type Sltiu struct{ *OpImm }
 type Xori struct{ *OpImm }
 type Slli struct{ *OpImm }
@@ -126,6 +134,12 @@ func (i *Jalr) Text() string {
 		if i.Rd() == Register(1) {
 			return fmt.Sprintf("%-4s %s", i.Mnemonic(), i.Rs1())
 		}
+
+		return fmt.Sprintf("%-4s %s, %s", i.Mnemonic(), i.Rd(), i.Rs1())
+	}
+
+	if i.Rd() == Register(0) {
+		return fmt.Sprintf("jr    %d(%s)", i.Imm(), i.Rs1())
 	}
 
 	return fmt.Sprintf("%-4s %s, %d(%s)",
@@ -198,8 +212,8 @@ func (i *Bge) Text() string {
 }
 
 func (i *Load) Text() string {
-	return fmt.Sprintf("%-4s %s, %s+%#x",
-		i.Mnemonic(), i.Rd(), i.Rs1(), i.Imm())
+	return fmt.Sprintf("%-4s %s, %d(%s)",
+		i.Mnemonic(), i.Rd(), i.Imm(), i.Rs1())
 }
 
 func (i *Store) Text() string {
@@ -228,6 +242,22 @@ func (i *System) Text() string {
 	}
 
 	return i.Mnemonic()
+}
+
+func (i *Sfence) Text() string {
+	if i.Rs2() == Register(0) {
+		return fmt.Sprintf("%-4s %s", i.Mnemonic(), i.Rs1())
+	}
+
+	return fmt.Sprintf("%-4s %s, %s", i.Mnemonic(), i.Rs1(), i.Rs2())
+}
+
+func (i *Hfence) Text() string {
+	if i.Rs2() == Register(0) {
+		return fmt.Sprintf("%-4s %s", i.Mnemonic(), i.Rs1())
+	}
+
+	return fmt.Sprintf("%-4s %s, %s", i.Mnemonic(), i.Rs1(), i.Rs2())
 }
 
 func (i *Csrrs) Text() string {
@@ -296,12 +326,12 @@ func (i *Sub) Text() string {
 }
 
 func (i *Slt) Text() string {
-	if i.Rs1() == Register(0) {
-		return fmt.Sprintf("sgtz %s, %s", i.Rd(), i.Rs2())
-	}
-
 	if i.Rs2() == Register(0) {
 		return fmt.Sprintf("sltz %s, %s", i.Rd(), i.Rs1())
+	}
+
+	if i.Rs1() == Register(0) {
+		return fmt.Sprintf("sgtz %s, %s", i.Rd(), i.Rs2())
 	}
 
 	return i.OpReg.Text()

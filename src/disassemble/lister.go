@@ -3,7 +3,7 @@ package main
 import "fmt"
 
 func listProgram(program *Program) {
-	fmt.Printf("; %v: file format %v-%v-%v\n",
+	fmt.Printf("\n\n; %v: file format %v-%v-%v\n\n",
 		program.name, program.class, program.order, program.machine)
 
 	for _, s := range program.sections {
