@@ -14,15 +14,11 @@ Disassembles rv32i with zifenci and zicsr extensions.
 
 ```bash
 ./build.sh
-./bin/disassemble
+./bin/disassemble -in ./riscv-tests/isa/rv32ui-p-simple
 ```
-
-This disassembles a hardcoded elf-binary from the riscv-tests.
 
 ## Future
 
-- Don't hardcode the test elf-binary for disassembler
-- Disassemble all riscv-tests and validate output
 - Create an emulator
 - Create an assembler
 - Create a debugger
