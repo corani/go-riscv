@@ -1,14 +1,19 @@
 package main
 
 import (
+	"fmt"
+
+	"github.com/corani/go-riscv/src/lister"
 	"github.com/corani/go-riscv/src/riscv"
 )
 
-func NewEmulator() *visitor {
+func NewEmulator(verbose bool) *visitor {
 	result := &visitor{
 		registers: make(map[riscv.Register]uint32),
 		inst:      make(map[uint32]riscv.Instruction),
 		pc:        0x80000000,
+		list:      lister.NewPrinter(),
+		verbose:   verbose,
 	}
 
 	for i := 0; i < 32; i++ {
@@ -16,6 +21,15 @@ func NewEmulator() *visitor {
 	}
 
 	return result
+}
+
+type visitor struct {
+	pc        uint32
+	registers map[riscv.Register]uint32
+	inst      map[uint32]riscv.Instruction
+	list      lister.Printer
+	verbose   bool
+	count     uint64
 }
 
 func (v *visitor) LoadSection(s riscv.Section) {
@@ -39,18 +53,40 @@ func (v *visitor) Current() riscv.Instruction {
 
 func (v *visitor) Step() bool {
 	i := v.Current()
+	v.count++
+
+	v.list.PrintLinef("===== %05d =====\n", v.count)
+	v.list.PrintInstruction(i)
+
+	if _, ok := i.(*riscv.Unimp); ok {
+		return false
+	}
 
 	if i.Visit(v) {
 		v.pc += 4
 	}
 
-	return true
-}
+	if v.verbose {
+		status := fmt.Sprintf("|\n|\t pc=%#8x", v.pc)
 
-type visitor struct {
-	pc        uint32
-	registers map[riscv.Register]uint32
-	inst      map[uint32]riscv.Instruction
+		for r := 1; r < 32; r++ {
+			if r%8 == 0 {
+				status += "\n|"
+			}
+
+			status += fmt.Sprintf("\t%3s=%#08x", riscv.Register(r), v.registers[riscv.Register(r)])
+		}
+
+		status += "\n|\n"
+
+		v.list.PrintLinef(status)
+	}
+
+	if _, ok := i.(*riscv.Ecall); ok {
+		return false
+	}
+
+	return true
 }
 
 func (v *visitor) Unimp(i *riscv.Unimp) bool {
@@ -58,10 +94,14 @@ func (v *visitor) Unimp(i *riscv.Unimp) bool {
 }
 
 func (v *visitor) Lui(i *riscv.Lui) bool {
+	v.setRegu(i.Rd(), uint32(i.Imm())<<12)
+
 	return true
 }
 
 func (v *visitor) Auipc(i *riscv.Auipc) bool {
+	v.setRegu(i.Rd(), i.Addr()+uint32(i.Imm())<<12)
+
 	return true
 }
 
@@ -176,6 +216,13 @@ func (v *visitor) Ebreak(i *riscv.Ebreak) bool {
 }
 
 func (v *visitor) Ecall(i *riscv.Ecall) bool {
+	switch v.registers[riscv.RegisterByName("a7")] {
+	case 93: // exit
+		v.list.PrintLinef("=> exit(%d)\n", v.registers[riscv.RegisterByName("a0")])
+	case 129: // kill
+		v.list.PrintLinef("=> kill(%d)\n", v.registers[riscv.RegisterByName("a0")])
+	}
+
 	return true
 }
 
@@ -234,6 +281,8 @@ func (v *visitor) Sub(i *riscv.Sub) bool {
 }
 
 func (v *visitor) Sra(i *riscv.Sra) bool {
+	v.setReg(i.Rd(), v.getReg(i.Rs1())>>v.getReg(i.Rs2()))
+
 	return true
 }
 
@@ -244,14 +293,28 @@ func (v *visitor) Add(i *riscv.Add) bool {
 }
 
 func (v *visitor) Sll(i *riscv.Sll) bool {
+	v.setRegu(i.Rd(), v.getRegu(i.Rs1())<<v.getRegu(i.Rs2()))
+
 	return true
 }
 
 func (v *visitor) Slt(i *riscv.Slt) bool {
+	if v.getReg(i.Rs1()) < v.getReg(i.Rs2()) {
+		v.setReg(i.Rd(), 1)
+	} else {
+		v.setReg(i.Rd(), 0)
+	}
+
 	return true
 }
 
 func (v *visitor) Sltu(i *riscv.Sltu) bool {
+	if v.getRegu(i.Rs1()) < v.getRegu(i.Rs2()) {
+		v.setReg(i.Rd(), 1)
+	} else {
+		v.setReg(i.Rd(), 0)
+	}
+
 	return true
 }
 
@@ -262,6 +325,8 @@ func (v *visitor) Xor(i *riscv.Xor) bool {
 }
 
 func (v *visitor) Srl(i *riscv.Srl) bool {
+	v.setRegu(i.Rd(), v.getRegu(i.Rs1())>>v.getRegu(i.Rs2()))
+
 	return true
 }
 
@@ -288,10 +353,22 @@ func (v *visitor) Addi(i *riscv.Addi) bool {
 }
 
 func (v *visitor) Slti(i *riscv.Slti) bool {
+	if v.getReg(i.Rs1()) < i.Imm() {
+		v.setReg(i.Rd(), 1)
+	} else {
+		v.setReg(i.Rd(), 0)
+	}
+
 	return true
 }
 
 func (v *visitor) Sltiu(i *riscv.Sltiu) bool {
+	if v.getRegu(i.Rs1()) < uint32(i.Imm()) {
+		v.setReg(i.Rd(), 1)
+	} else {
+		v.setReg(i.Rd(), 0)
+	}
+
 	return true
 }
 
@@ -302,10 +379,14 @@ func (v *visitor) Xori(i *riscv.Xori) bool {
 }
 
 func (v *visitor) Slli(i *riscv.Slli) bool {
+	v.setRegu(i.Rd(), v.getRegu(i.Rs1())<<uint32(i.Imm()))
+
 	return true
 }
 
 func (v *visitor) Srli(i *riscv.Srli) bool {
+	v.setRegu(i.Rd(), v.getRegu(i.Rs1())>>uint32(i.Imm()))
+
 	return true
 }
 
@@ -322,6 +403,8 @@ func (v *visitor) Andi(i *riscv.Andi) bool {
 }
 
 func (v *visitor) jump(addr uint32) bool {
+	v.list.PrintLinef("| => took branch\n")
+
 	v.pc = addr
 
 	return false
