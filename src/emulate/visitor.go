@@ -30,6 +30,7 @@ type visitor struct {
 	list      lister.Printer
 	verbose   bool
 	count     uint64
+	done      bool
 }
 
 func (v *visitor) LoadSection(s riscv.Section) {
@@ -55,12 +56,8 @@ func (v *visitor) Step() bool {
 	i := v.Current()
 	v.count++
 
-	v.list.PrintLinef("===== %05d =====\n", v.count)
+	v.list.PrintLinef("===== %04d =====\n", v.count)
 	v.list.PrintInstruction(i)
-
-	if _, ok := i.(*riscv.Unimp); ok {
-		return false
-	}
 
 	if i.Visit(v) {
 		v.pc += 4
@@ -82,7 +79,9 @@ func (v *visitor) Step() bool {
 		v.list.PrintLinef(status)
 	}
 
-	if _, ok := i.(*riscv.Ecall); ok {
+	if v.done {
+		v.list.PrintLinef("===== done =====\n\n")
+
 		return false
 	}
 
@@ -216,11 +215,19 @@ func (v *visitor) Ebreak(i *riscv.Ebreak) bool {
 }
 
 func (v *visitor) Ecall(i *riscv.Ecall) bool {
-	switch v.registers[riscv.RegisterByName("a7")] {
+	id := v.registers[riscv.RegisterByName("a7")]
+
+	switch id {
 	case 93: // exit
 		v.list.PrintLinef("=> exit(%d)\n", v.registers[riscv.RegisterByName("a0")])
+
+		v.done = true
 	case 129: // kill
 		v.list.PrintLinef("=> kill(%d)\n", v.registers[riscv.RegisterByName("a0")])
+
+		v.done = true
+	default:
+		v.list.PrintLinef("=> ecall(%d)\n", id)
 	}
 
 	return true

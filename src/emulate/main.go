@@ -13,13 +13,17 @@ func verify(err error) {
 }
 
 func main() {
-	var name string
+	var (
+		name string
+		iter int
+	)
 
 	flag.StringVar(&name, "in", "./riscv-tests/isa/rv32-p-simple", "path to input file")
+	flag.IntVar(&iter, "iter", 500, "maximum number of instructions to run")
 	flag.Parse()
 
 	program, err := elf.Load(name)
 	verify(err)
 
-	runProgram(program)
+	runProgram(program, iter)
 }

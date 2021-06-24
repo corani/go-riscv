@@ -1,11 +1,13 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/corani/go-riscv/src/riscv"
 )
 
-func runProgram(p riscv.Program) {
-	emulator := NewEmulator(true)
+func runProgram(p riscv.Program, iter int) {
+	emulator := NewEmulator(false)
 
 	for _, s := range p.Sections() {
 		emulator.LoadSection(s)
@@ -13,11 +15,13 @@ func runProgram(p riscv.Program) {
 
 	i := 0
 
-	for i < 500 {
+	for i < iter {
 		if !emulator.Step() {
-			break
+			return
 		}
 
 		i++
 	}
+
+	fmt.Println("==== terminated ====")
 }
