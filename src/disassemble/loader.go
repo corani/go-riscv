@@ -4,35 +4,29 @@ import (
 	"debug/elf"
 	"encoding/binary"
 	"fmt"
+
+	"github.com/corani/go-riscv/src/riscv"
 )
 
-func loadElf(name string) (*Program, error) {
+func loadElf(name string) (riscv.Program, error) {
 	f, err := elf.Open(name)
 	if err != nil {
 		return nil, err
-	}
-
-	program := Program{
-		name: name,
 	}
 
 	if f.Machine != elf.EM_RISCV {
 		return nil, fmt.Errorf("machine is not riscv: %v", f.Machine)
 	}
 
-	program.machine = "riscv"
-
 	if f.Class != elf.ELFCLASS32 {
 		return nil, fmt.Errorf("class is not 32-bit: %v", f.Class)
 	}
-
-	program.class = "elf32"
 
 	if f.Data != elf.ELFDATA2LSB {
 		return nil, fmt.Errorf("data is not little-endian: %v", f.Data)
 	}
 
-	program.order = "little"
+	program := riscv.NewProgram(name, "riscv", "elf32", "little")
 
 	syms, err := f.Symbols()
 	if err != nil {
@@ -56,25 +50,20 @@ func loadElf(name string) (*Program, error) {
 			continue
 		}
 
-		section := Section{
-			name:    s.Name,
-			base:    uint32(s.Addr),
-			data:    make([]uint32, s.Size/4),
-			symbols: make(map[uint32]string),
-		}
+		section := riscv.NewSection(s.Name, uint32(s.Addr), uint32(s.Size/4))
 
 		for k, v := range symbols {
 			if uint64(k) >= s.Addr && uint64(k) <= s.Addr+s.Size {
-				section.symbols[k] = v
+				section.AddSymbol(k, v)
 			}
 		}
 
-		if err := binary.Read(s.Open(), binary.LittleEndian, &section.data); err != nil {
+		if err := binary.Read(s.Open(), binary.LittleEndian, section.Data()); err != nil {
 			return nil, err
 		}
 
-		program.sections = append(program.sections, section)
+		program.AddSection(section)
 	}
 
-	return &program, nil
+	return program, nil
 }

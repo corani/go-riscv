@@ -22,4 +22,4 @@ Disassembles rv32i with zifenci and zicsr extensions.
 - Create an emulator
 - Create an assembler
 - Create a debugger
-- Support rv32m, rv32f?
+- Support rv32g: rv32m (mul/div) + rv32a (atomic) + rv32f (float) + rv32d (double)?

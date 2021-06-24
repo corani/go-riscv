@@ -1,4 +1,4 @@
-package main
+package riscv
 
 import (
 	"fmt"
@@ -119,7 +119,7 @@ const (
 	func3CSRRCI Func3 = 0b111
 )
 
-func decodeInstruction(section *Section, addr, raw uint32, sym string) Instruction {
+func decodeInstruction(section Section, addr, raw uint32, sym string) Instruction {
 	i := &instruction{
 		section: section,
 		addr:    addr,

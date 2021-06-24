@@ -1,9 +1,9 @@
-package main
+package riscv
 
 import "fmt"
 
 type instruction struct {
-	section  *Section
+	section  Section
 	addr     uint32
 	raw      uint32
 	sym      string
@@ -388,7 +388,7 @@ func (i *Sltiu) Text() string {
 	return i.OpImm.Text()
 }
 
-func (i *instruction) Section() *Section {
+func (i *instruction) Section() Section {
 	return i.section
 }
 

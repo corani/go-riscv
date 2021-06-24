@@ -1,13 +1,17 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
 
-func listProgram(program *Program) {
+	"github.com/corani/go-riscv/src/riscv"
+)
+
+func listProgram(program riscv.Program) {
 	fmt.Printf("\n\n; %v: file format %v-%v-%v\n\n",
-		program.name, program.class, program.order, program.machine)
+		program.Name(), program.Class(), program.Order(), program.Machine())
 
-	for _, s := range program.sections {
-		fmt.Printf("; Section %v (%v instr, %v syms)\n", s.name, len(s.data), len(s.symbols))
+	for _, s := range program.Sections() {
+		fmt.Printf("; Disassembly of section %v (%d instructions)\n", s.Name(), s.Size())
 
 		r := s.Reader()
 		for inst := r.Next(); inst != nil; inst = r.Next() {
