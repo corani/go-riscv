@@ -55,7 +55,7 @@ func (v *visitor) Auipc(i *riscv.Auipc) bool {
 }
 
 func (v *visitor) Jal(i *riscv.Jal) bool {
-	addr := uint32(int64(i.Addr()) + int64(i.Imm()))
+	addr := i.Target()
 
 	// Syntactic Sugar: jal zero, offset == j offset
 	if i.Rd() == riscv.Register(0) {
@@ -104,7 +104,7 @@ func (v *visitor) Jalr(i *riscv.Jalr) bool {
 }
 
 func (v *visitor) Beq(i *riscv.Beq) bool {
-	addr := uint32(int64(i.Addr()) + int64(i.Imm()))
+	addr := i.Target()
 
 	if i.Rs2() == riscv.Register(0) {
 		return v.printInstr(i, fmt.Sprintf("beqz     %s, %08x %s",
@@ -116,7 +116,7 @@ func (v *visitor) Beq(i *riscv.Beq) bool {
 }
 
 func (v *visitor) Bne(i *riscv.Bne) bool {
-	addr := uint32(int64(i.Addr()) + int64(i.Imm()))
+	addr := i.Target()
 
 	if i.Rs2() == riscv.Register(0) {
 		return v.printInstr(i, fmt.Sprintf("bnez     %s, %08x %s",
@@ -128,7 +128,7 @@ func (v *visitor) Bne(i *riscv.Bne) bool {
 }
 
 func (v *visitor) Blt(i *riscv.Blt) bool {
-	addr := uint32(int64(i.Addr()) + int64(i.Imm()))
+	addr := i.Target()
 
 	if i.Rs2() == riscv.Register(0) {
 		return v.printInstr(i, fmt.Sprintf("bltz     %s, %08x %s",
@@ -145,7 +145,7 @@ func (v *visitor) Blt(i *riscv.Blt) bool {
 }
 
 func (v *visitor) Bge(i *riscv.Bge) bool {
-	addr := uint32(int64(i.Addr()) + int64(i.Imm()))
+	addr := i.Target()
 
 	if i.Rs2() == riscv.Register(0) {
 		return v.printInstr(i, fmt.Sprintf("bgez     %s, %08x %s",
@@ -162,14 +162,14 @@ func (v *visitor) Bge(i *riscv.Bge) bool {
 }
 
 func (v *visitor) Bltu(i *riscv.Bltu) bool {
-	addr := uint32(int64(i.Addr()) + int64(i.Imm()))
+	addr := i.Target()
 
 	return v.printInstr(i, fmt.Sprintf("%-8s %s, %s, %08x %s",
 		i.Mnemonic(), i.Rs1(), i.Rs2(), addr, i.NearestSymbol(addr)))
 }
 
 func (v *visitor) Bgeu(i *riscv.Bgeu) bool {
-	addr := uint32(int64(i.Addr()) + int64(i.Imm()))
+	addr := i.Target()
 
 	return v.printInstr(i, fmt.Sprintf("%-8s %s, %s, %08x %s",
 		i.Mnemonic(), i.Rs1(), i.Rs2(), addr, i.NearestSymbol(addr)))

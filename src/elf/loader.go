@@ -1,4 +1,4 @@
-package main
+package elf
 
 import (
 	"debug/elf"
@@ -8,7 +8,7 @@ import (
 	"github.com/corani/go-riscv/src/riscv"
 )
 
-func loadElf(name string) (riscv.Program, error) {
+func Load(name string) (riscv.Program, error) {
 	f, err := elf.Open(name)
 	if err != nil {
 		return nil, err

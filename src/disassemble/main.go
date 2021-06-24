@@ -1,6 +1,10 @@
 package main
 
-import "flag"
+import (
+	"flag"
+
+	"github.com/corani/go-riscv/src/elf"
+)
 
 func verify(err error) {
 	if err != nil {
@@ -14,7 +18,7 @@ func main() {
 	flag.StringVar(&name, "in", "./riscv-tests/isa/rv32ui-p-add", "path to input file")
 	flag.Parse()
 
-	program, err := loadElf(name)
+	program, err := elf.Load(name)
 	verify(err)
 
 	listProgram(program)

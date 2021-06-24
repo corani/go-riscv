@@ -9,6 +9,7 @@ type Instruction interface {
 	Rs1() Register
 	Rs2() Register
 	NearestSymbol(addr uint32) string
+	Mnemonic() string
 	Visit(InstructionVisitor) bool
 }
 
@@ -92,6 +93,18 @@ type Slli struct{ *OpImm }
 type Srli struct{ *OpImm }
 type Ori struct{ *OpImm }
 type Andi struct{ *OpImm }
+
+func (i *Jal) Target() uint32 {
+	return uint32(int64(i.Addr()) + int64(i.Imm()))
+}
+
+func (i *Jalr) Target(base uint32) uint32 {
+	return uint32(int64(base) + int64(i.Imm()))
+}
+
+func (i *Branch) Target() uint32 {
+	return uint32(int64(i.Addr()) + int64(i.Imm()))
+}
 
 func (i *System) Csr() string {
 	return CsrName(uint32(i.Imm()))
