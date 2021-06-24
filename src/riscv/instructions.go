@@ -2,6 +2,13 @@ package riscv
 
 import "fmt"
 
+type Instruction interface {
+	Addr() uint32
+	Raw() uint32
+	Sym() string
+	Text() string
+}
+
 type instruction struct {
 	section  Section
 	addr     uint32

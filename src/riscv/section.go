@@ -5,15 +5,6 @@ import (
 	"math"
 )
 
-type Program interface {
-	Name() string
-	Machine() string
-	Class() string
-	Order() string
-	Sections() []Section
-	AddSection(s Section)
-}
-
 type Section interface {
 	Name() string
 	Base() uint32
@@ -24,15 +15,16 @@ type Section interface {
 	NearestSymbol(uint32) string
 	SymbolForIndex(uint32) (string, bool)
 	AddrForIndex(uint32) uint32
-	Reader() *SectionReader
+	Reader() SectionReader
 }
 
-type program struct {
-	name     string
-	machine  string
-	class    string
-	order    string
-	sections []Section
+type SectionReader interface {
+	Next() Instruction
+}
+
+type sectionReader struct {
+	section *section
+	index   uint32
 }
 
 type section struct {
@@ -41,51 +33,6 @@ type section struct {
 	size    uint32
 	symbols map[uint32]string
 	data    []uint32
-}
-
-type SectionReader struct {
-	section Section
-	index   uint32
-}
-
-type Instruction interface {
-	Addr() uint32
-	Raw() uint32
-	Sym() string
-	Text() string
-}
-
-func NewProgram(name, machine, class, order string) Program {
-	return &program{
-		name:    name,
-		machine: machine,
-		class:   class,
-		order:   order,
-	}
-}
-
-func (p *program) Name() string {
-	return p.name
-}
-
-func (p *program) Machine() string {
-	return p.machine
-}
-
-func (p *program) Class() string {
-	return p.class
-}
-
-func (p *program) Order() string {
-	return p.order
-}
-
-func (p *program) Sections() []Section {
-	return p.sections
-}
-
-func (p *program) AddSection(s Section) {
-	p.sections = append(p.sections, s)
 }
 
 func NewSection(name string, base, size uint32) Section {
@@ -152,23 +99,21 @@ func (s *section) AddrForIndex(i uint32) uint32 {
 	return s.base + i*4
 }
 
-func (s *section) Reader() *SectionReader {
-	return &SectionReader{
+func (s *section) Reader() SectionReader {
+	return &sectionReader{
 		section: s,
 		index:   0,
 	}
 }
 
-func (r *SectionReader) Next() Instruction {
-	s := r.section.(*section)
-
-	if int(r.index) >= len(s.data) {
+func (r *sectionReader) Next() Instruction {
+	if int(r.index) >= len(r.section.data) {
 		return nil
 	}
 
 	sym, _ := r.section.SymbolForIndex(r.index)
 	addr := r.section.AddrForIndex(r.index)
-	raw := s.data[r.index]
+	raw := r.section.data[r.index]
 
 	inst := decodeInstruction(r.section, addr, raw, sym)
 
