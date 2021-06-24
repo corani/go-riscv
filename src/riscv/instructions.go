@@ -1,12 +1,15 @@
 package riscv
 
-import "fmt"
-
 type Instruction interface {
 	Addr() uint32
 	Raw() uint32
 	Sym() string
-	Text() string
+	Imm() int32
+	Rd() Register
+	Rs1() Register
+	Rs2() Register
+	NearestSymbol(addr uint32) string
+	Visit(InstructionVisitor) bool
 }
 
 type instruction struct {
@@ -90,309 +93,12 @@ type Srli struct{ *OpImm }
 type Ori struct{ *OpImm }
 type Andi struct{ *OpImm }
 
-func (i *Unimp) Text() string {
-	if i.raw == 0 {
-		return i.Mnemonic()
-	}
-
-	return fmt.Sprintf("%s %d",
-		i.Mnemonic(), i.Raw())
-}
-
-func (i *Lui) Text() string {
-	return fmt.Sprintf("%-4s %s, %#x",
-		i.Mnemonic(), i.Rd(), i.Imm())
-}
-
-func (i *Auipc) Text() string {
-	return fmt.Sprintf("%-4s %s, %#x",
-		i.Mnemonic(), i.Rd(), i.Imm())
-}
-
-func (i *Jal) Text() string {
-	addr := i.target(i.Imm())
-
-	// Syntactic Sugar: jal zero, offset == j offset
-	if i.Rd() == Register(0) {
-		return fmt.Sprintf("j    %08x %s",
-			addr, i.nearestSymbol(addr))
-	}
-
-	// Syntactic Sugar: jal x1, offset == jal offset
-	if i.Rd() == Register(1) {
-		return fmt.Sprintf("%-4s %08x %s",
-			i.Mnemonic(), addr, i.nearestSymbol(addr))
-	}
-
-	return fmt.Sprintf("%-4s %s, %08x %s",
-		i.Mnemonic(), i.Rd(), addr, i.nearestSymbol(addr))
-}
-
-func (i *Jalr) Text() string {
-	if i.Imm() == 0 {
-		if i.Rd() == Register(0) && i.Rs1() == Register(1) {
-			return "ret"
-		}
-
-		if i.Rd() == Register(0) {
-			return fmt.Sprintf("jr   %s", i.Rs1())
-		}
-
-		if i.Rd() == Register(1) {
-			return fmt.Sprintf("%-4s %s", i.Mnemonic(), i.Rs1())
-		}
-
-		return fmt.Sprintf("%-4s %s, %s", i.Mnemonic(), i.Rd(), i.Rs1())
-	}
-
-	if i.Rd() == Register(0) {
-		return fmt.Sprintf("jr    %d(%s)", i.Imm(), i.Rs1())
-	}
-
-	return fmt.Sprintf("%-4s %s, %d(%s)",
-		i.Mnemonic(), i.Rd(), i.Imm(), i.Rs1())
-}
-
-func (i *Branch) Text() string {
-	addr := i.target(i.Imm())
-
-	return fmt.Sprintf("%-4s %s, %s, %08x %s",
-		i.Mnemonic(), i.Rs1(), i.Rs2(), addr, i.nearestSymbol(addr))
-}
-
-func (i *Beq) Text() string {
-	if i.Rs2() == Register(0) {
-		addr := i.target(i.Imm())
-
-		return fmt.Sprintf("beqz %s, %08x %s",
-			i.Rs1(), addr, i.nearestSymbol(addr))
-	}
-
-	return i.Branch.Text()
-}
-
-func (i *Bne) Text() string {
-	if i.Rs2() == Register(0) {
-		addr := i.target(i.Imm())
-
-		return fmt.Sprintf("bnez %s, %08x %s",
-			i.Rs1(), addr, i.nearestSymbol(addr))
-	}
-
-	return i.Branch.Text()
-}
-
-func (i *Blt) Text() string {
-	if i.Rs2() == Register(0) {
-		addr := i.target(i.Imm())
-
-		return fmt.Sprintf("bltz %s, %08x %s",
-			i.Rs1(), addr, i.nearestSymbol(addr))
-	}
-
-	if i.Rs1() == Register(0) {
-		addr := i.target(i.Imm())
-
-		return fmt.Sprintf("bgtz %s, %08x %s",
-			i.Rs2(), addr, i.nearestSymbol(addr))
-	}
-
-	return i.Branch.Text()
-}
-
-func (i *Bge) Text() string {
-	if i.Rs2() == Register(0) {
-		addr := i.target(i.Imm())
-
-		return fmt.Sprintf("bgez %s, %08x %s",
-			i.Rs1(), addr, i.nearestSymbol(addr))
-	}
-
-	if i.Rs1() == Register(0) {
-		addr := i.target(i.Imm())
-
-		return fmt.Sprintf("blez %s, %08x %s",
-			i.Rs2(), addr, i.nearestSymbol(addr))
-	}
-
-	return i.Branch.Text()
-}
-
-func (i *Load) Text() string {
-	return fmt.Sprintf("%-4s %s, %d(%s)",
-		i.Mnemonic(), i.Rd(), i.Imm(), i.Rs1())
-}
-
-func (i *Store) Text() string {
-	return fmt.Sprintf("%-4s %s, %d(%s)",
-		i.Mnemonic(), i.Rs2(), i.Imm(), i.Rs1())
-}
-
-func (i *Misc) Text() string {
-	return i.Mnemonic()
-}
-
 func (i *System) Csr() string {
 	return CsrName(uint32(i.Imm()))
 }
 
 func (i *System) Uimm() uint8 {
 	return uint8(i.bits(19, 15))
-}
-
-func (i *System) Text() string {
-	switch i.Func3() {
-	case func3CSRRW, func3CSRRS, func3CSRRC:
-		return fmt.Sprintf("%-4s %s, %s, %s", i.Mnemonic(), i.Rd(), i.Csr(), i.Rs1())
-	case func3CSRRWI, func3CSRRSI, func3CSRRCI:
-		return fmt.Sprintf("%-4s %s, %s, %d", i.Mnemonic(), i.Rd(), i.Csr(), i.Uimm())
-	}
-
-	return i.Mnemonic()
-}
-
-func (i *Sfence) Text() string {
-	if i.Rs2() == Register(0) {
-		return fmt.Sprintf("%-4s %s", i.Mnemonic(), i.Rs1())
-	}
-
-	return fmt.Sprintf("%-4s %s, %s", i.Mnemonic(), i.Rs1(), i.Rs2())
-}
-
-func (i *Hfence) Text() string {
-	if i.Rs2() == Register(0) {
-		return fmt.Sprintf("%-4s %s", i.Mnemonic(), i.Rs1())
-	}
-
-	return fmt.Sprintf("%-4s %s, %s", i.Mnemonic(), i.Rs1(), i.Rs2())
-}
-
-func (i *Csrrs) Text() string {
-	if i.Rs1() == Register(0) {
-		return fmt.Sprintf("csrr %s, %s", i.Rd(), i.Csr())
-	}
-
-	if i.Rd() == Register(0) {
-		return fmt.Sprintf("csrs %s, %s", i.Csr(), i.Rs1())
-	}
-
-	return i.System.Text()
-}
-
-func (i *Csrrw) Text() string {
-	if i.Rd() == Register(0) {
-		return fmt.Sprintf("csrw %s, %s", i.Csr(), i.Rs1())
-	}
-
-	return i.System.Text()
-}
-
-func (i *Csrrc) Text() string {
-	if i.Rd() == Register(0) {
-		return fmt.Sprintf("csrc %s, %s", i.Csr(), i.Rs1())
-	}
-
-	return i.System.Text()
-}
-
-func (i *Csrrsi) Text() string {
-	if i.Rd() == Register(0) {
-		return fmt.Sprintf("csrsi %s, %d", i.Csr(), i.Uimm())
-	}
-
-	return i.System.Text()
-}
-
-func (i *Csrrwi) Text() string {
-	if i.Rd() == Register(0) {
-		return fmt.Sprintf("csrwi %s, %d", i.Csr(), i.Uimm())
-	}
-
-	return i.System.Text()
-}
-
-func (i *Csrrci) Text() string {
-	if i.Rd() == Register(0) {
-		return fmt.Sprintf("csrci %s, %d", i.Csr(), i.Uimm())
-	}
-
-	return i.System.Text()
-}
-
-func (i *OpReg) Text() string {
-	return fmt.Sprintf("%-4s %s, %s, %s",
-		i.Mnemonic(), i.Rd(), i.Rs1(), i.Rs2())
-}
-
-func (i *Sub) Text() string {
-	if i.Rs1() == Register(0) {
-		return fmt.Sprintf("neg  %s, %s", i.Rd(), i.Rs2())
-	}
-
-	return i.OpReg.Text()
-}
-
-func (i *Slt) Text() string {
-	if i.Rs2() == Register(0) {
-		return fmt.Sprintf("sltz %s, %s", i.Rd(), i.Rs1())
-	}
-
-	if i.Rs1() == Register(0) {
-		return fmt.Sprintf("sgtz %s, %s", i.Rd(), i.Rs2())
-	}
-
-	return i.OpReg.Text()
-}
-
-func (i *Sltu) Text() string {
-	if i.Rs1() == Register(0) {
-		return fmt.Sprintf("snez %s, %s", i.Rd(), i.Rs2())
-	}
-
-	return i.OpReg.Text()
-}
-
-func (i *OpImm) Text() string {
-	switch i.Func3() {
-	case func3SLLI, func3SRLI:
-		return fmt.Sprintf("%-4s %s, %s, %#x",
-			i.Mnemonic(), i.Rd(), i.Rs1(), i.shamt())
-	default:
-		return fmt.Sprintf("%-4s %s, %s, %d",
-			i.Mnemonic(), i.Rd(), i.Rs1(), i.Imm())
-	}
-}
-
-func (i *Xori) Text() string {
-	if i.Imm() == -1 {
-		return fmt.Sprintf("not  %s, %s", i.Rd(), i.Rs1())
-	}
-
-	return i.OpImm.Text()
-}
-
-func (i *Addi) Text() string {
-	if i.Rd() == Register(0) && i.Rs1() == Register(0) && i.Imm() == 0 {
-		return "nop"
-	}
-
-	if i.Rs1() == Register(0) {
-		return fmt.Sprintf("li   %s, %d", i.Rd(), i.Imm())
-	}
-
-	if i.Imm() == 0 {
-		return fmt.Sprintf("mv   %s, %s", i.Rd(), i.Rs1())
-	}
-
-	return i.OpImm.Text()
-}
-
-func (i *Sltiu) Text() string {
-	if i.Imm() == 1 {
-		return fmt.Sprintf("seqz %s, %s", i.Rd(), i.Rs1())
-	}
-
-	return i.OpImm.Text()
 }
 
 func (i *instruction) Section() Section {
@@ -449,14 +155,6 @@ func (i *instruction) bits(s, e int) uint32 {
 	return (i.raw >> e) & ((1 << (s - e + 1)) - 1)
 }
 
-func (i *instruction) nearestSymbol(addr uint32) string {
+func (i *instruction) NearestSymbol(addr uint32) string {
 	return i.section.NearestSymbol(addr)
-}
-
-func (i *instruction) target(offset int32) uint32 {
-	return uint32(int64(i.Addr()) + int64(offset))
-}
-
-func (i *instruction) shamt() uint8 {
-	return uint8(i.Imm() & 0b11111)
 }
