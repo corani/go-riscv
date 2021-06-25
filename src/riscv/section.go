@@ -16,6 +16,7 @@ type Section interface {
 	SymbolForIndex(uint32) (string, bool)
 	AddrForIndex(uint32) uint32
 	Reader() SectionReader
+	GetBytes(addr, count uint32) []byte
 }
 
 type SectionReader interface {
@@ -97,6 +98,35 @@ func (s *section) SymbolForIndex(i uint32) (string, bool) {
 
 func (s *section) AddrForIndex(i uint32) uint32 {
 	return s.base + i*4
+}
+
+func (s *section) GetBytes(addr, count uint32) []byte {
+	getByte := func(addr uint32) byte {
+		base := addr & 0xfffffffc
+
+		w := s.data[base>>2]
+
+		switch addr & 0x3 {
+		case 0:
+			return byte((w >> 0) & 0xff)
+		case 1:
+			return byte((w >> 8) & 0xff)
+		case 2:
+			return byte((w >> 16) & 0xff)
+		case 3:
+			return byte((w >> 24) & 0xff)
+		}
+
+		return 0
+	}
+
+	var result []byte
+
+	for i := uint32(0); i < count; i++ {
+		result = append(result, getByte(addr+i))
+	}
+
+	return result
 }
 
 func (s *section) Reader() SectionReader {

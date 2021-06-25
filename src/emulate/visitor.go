@@ -16,6 +16,8 @@ func NewEmulator(verbose bool, entry uint32) *visitor {
 		verbose:   verbose,
 	}
 
+	result.syscall = &syscall{v: result}
+
 	for i := 0; i < 32; i++ {
 		result.registers[riscv.Register(0)] = 0
 	}
@@ -25,9 +27,11 @@ func NewEmulator(verbose bool, entry uint32) *visitor {
 
 type visitor struct {
 	pc        uint32
+	sections  []riscv.Section
 	registers map[riscv.Register]uint32
 	inst      map[uint32]riscv.Instruction
 	list      lister.Printer
+	syscall   *syscall
 	verbose   bool
 	count     uint64
 	done      bool
@@ -35,12 +39,18 @@ type visitor struct {
 }
 
 func (v *visitor) LoadSection(s riscv.Section) {
-	v.list.PrintLinef("\n; Disassembly of section %s (base=%08x, size=%d)\n",
-		s.Name(), s.Base(), s.Size())
+	if v.verbose {
+		v.list.PrintLinef("\n; Disassembly of section %s (base=%08x, size=%d)\n",
+			s.Name(), s.Base(), s.Size())
+	}
+
+	v.sections = append(v.sections, s)
 
 	r := s.Reader()
 	for i := r.Next(); i != nil; i = r.Next() {
-		v.list.PrintInstruction(i)
+		if v.verbose {
+			v.list.PrintInstruction(i)
+		}
 
 		v.inst[i.Addr()] = i
 	}
@@ -53,6 +63,16 @@ func (v *visitor) PC() uint32 {
 func (v *visitor) Current() riscv.Instruction {
 	if v, ok := v.inst[v.pc]; ok {
 		return v
+	}
+
+	return nil
+}
+
+func (v *visitor) SectionFor(addr uint32) riscv.Section {
+	for _, s := range v.sections {
+		if s.Base() <= addr && s.Base()+s.Size() >= addr {
+			return s
+		}
 	}
 
 	return nil
@@ -357,30 +377,6 @@ func (v *visitor) Fencei(i *riscv.Fencei) bool {
 }
 
 func (v *visitor) Ebreak(i *riscv.Ebreak) bool {
-	return true
-}
-
-func (v *visitor) Ecall(i *riscv.Ecall) bool {
-	id := v.registers[riscv.RegisterByName("a7")]
-
-	switch id {
-	case 93: // exit
-		code := v.registers[riscv.RegisterByName("a0")]
-		v.list.PrintLinef("=> exit(%d)\n", code)
-
-		v.done = true
-		v.exitCode = int(code)
-	case 129: // kill
-		code := v.registers[riscv.RegisterByName("a0")]
-
-		v.list.PrintLinef("=> kill(%d)\n", code)
-
-		v.done = true
-		v.exitCode = int(code)
-	default:
-		v.list.PrintLinef("=> ecall(%d)\n", id)
-	}
-
 	return true
 }
 
