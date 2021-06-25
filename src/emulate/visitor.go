@@ -11,10 +11,9 @@ func NewEmulator(verbose bool, entry uint32) *visitor {
 	result := &visitor{
 		registers: make(map[riscv.Register]uint32),
 		inst:      make(map[uint32]riscv.Instruction),
-		//pc:        0x80000000,
-		pc:      entry,
-		list:    lister.NewPrinter(),
-		verbose: verbose,
+		pc:        entry,
+		list:      lister.NewPrinter(),
+		verbose:   verbose,
 	}
 
 	for i := 0; i < 32; i++ {
@@ -36,8 +35,13 @@ type visitor struct {
 }
 
 func (v *visitor) LoadSection(s riscv.Section) {
+	v.list.PrintLinef("\n; Disassembly of section %s (base=%08x, size=%d)\n",
+		s.Name(), s.Base(), s.Size())
+
 	r := s.Reader()
 	for i := r.Next(); i != nil; i = r.Next() {
+		v.list.PrintInstruction(i)
+
 		v.inst[i.Addr()] = i
 	}
 }
@@ -176,23 +180,112 @@ func (v *visitor) Bgeu(i *riscv.Bgeu) bool {
 	return true
 }
 
+func (v *visitor) Load(addr uint32) uint32 {
+	// align to 4 bytes
+	base := addr & 0xfffffffc
+
+	if data, ok := v.inst[base]; ok {
+		return data.Raw()
+	} else {
+		panic(fmt.Sprintf("load mem out of range: %08x", base))
+	}
+}
+
+func (v *visitor) SignExtend(x uint32, l int) uint32 {
+	if x>>(l-1) == 1 {
+		return -((1 << l) - x)
+	}
+
+	return x
+}
+
 func (v *visitor) Lb(i *riscv.Lb) bool {
+	addr := i.Mem(v.getRegu(i.Rs1()))
+
+	data := v.Load(addr)
+
+	switch addr & 0x3 {
+	case 0:
+	case 1:
+		data >>= 8
+	case 2:
+		data >>= 16
+	case 3:
+		data >>= 24
+	}
+
+	data &= 0xff
+	data = v.SignExtend(data, 8)
+
+	v.setRegu(i.Rd(), data)
+
 	return true
 }
 
 func (v *visitor) Lh(i *riscv.Lh) bool {
+	addr := i.Mem(v.getRegu(i.Rs1()))
+
+	data := v.Load(addr)
+
+	switch addr & 0x3 {
+	case 0:
+	case 2:
+		data >>= 16
+	}
+
+	data &= 0xffff
+	data = v.SignExtend(data, 16)
+
+	v.setRegu(i.Rd(), data)
+
 	return true
 }
 
 func (v *visitor) Lw(i *riscv.Lw) bool {
+	addr := i.Mem(v.getRegu(i.Rs1()))
+
+	v.setRegu(i.Rd(), v.Load(addr))
+
 	return true
 }
 
 func (v *visitor) Lbu(i *riscv.Lbu) bool {
+	addr := i.Mem(v.getRegu(i.Rs1()))
+
+	data := v.Load(addr)
+
+	switch addr & 0x3 {
+	case 0:
+	case 1:
+		data >>= 8
+	case 2:
+		data >>= 16
+	case 3:
+		data >>= 24
+	}
+
+	data &= 0xff
+
+	v.setRegu(i.Rd(), data)
+
 	return true
 }
 
 func (v *visitor) Lhu(i *riscv.Lhu) bool {
+	addr := i.Mem(v.getRegu(i.Rs1()))
+
+	data := v.Load(addr)
+
+	switch addr & 0x3 {
+	case 0:
+	case 2:
+		data >>= 16
+	}
+
+	data &= 0xffff
+
+	v.setRegu(i.Rd(), data)
+
 	return true
 }
 
