@@ -7,13 +7,14 @@ import (
 	"github.com/corani/go-riscv/src/riscv"
 )
 
-func NewEmulator(verbose bool) *visitor {
+func NewEmulator(verbose bool, entry uint32) *visitor {
 	result := &visitor{
 		registers: make(map[riscv.Register]uint32),
 		inst:      make(map[uint32]riscv.Instruction),
-		pc:        0x80000000,
-		list:      lister.NewPrinter(),
-		verbose:   verbose,
+		//pc:        0x80000000,
+		pc:      entry,
+		list:    lister.NewPrinter(),
+		verbose: verbose,
 	}
 
 	for i := 0; i < 32; i++ {

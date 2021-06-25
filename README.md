@@ -41,6 +41,8 @@ To run the emulator for all the riscv-tests:
 ## Future
 
 - Complete emulator and get all tests to pass
+  - Create memory
+  - Load data from elf into memory
 - Create an assembler
 - Create a debugger
 - Support rv32g: rv32m (mul/div) + rv32a (atomic) + rv32f (float) + rv32d (double)?

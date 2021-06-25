@@ -5,6 +5,7 @@ type Program interface {
 	Machine() string
 	Class() string
 	Order() string
+	Entry() uint32
 	Sections() []Section
 	AddSection(s Section)
 }
@@ -14,15 +15,17 @@ type program struct {
 	machine  string
 	class    string
 	order    string
+	entry    uint32
 	sections []Section
 }
 
-func NewProgram(name, machine, class, order string) Program {
+func NewProgram(name, machine, class, order string, entry uint32) Program {
 	return &program{
 		name:    name,
 		machine: machine,
 		class:   class,
 		order:   order,
+		entry:   entry,
 	}
 }
 
@@ -40,6 +43,10 @@ func (p *program) Class() string {
 
 func (p *program) Order() string {
 	return p.order
+}
+
+func (p *program) Entry() uint32 {
+	return p.entry
 }
 
 func (p *program) Sections() []Section {

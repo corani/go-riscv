@@ -7,7 +7,7 @@ import (
 )
 
 func runProgram(p riscv.Program, verbose bool, iter int) int {
-	emulator := NewEmulator(verbose)
+	emulator := NewEmulator(verbose, p.Entry())
 
 	for _, s := range p.Sections() {
 		emulator.LoadSection(s)

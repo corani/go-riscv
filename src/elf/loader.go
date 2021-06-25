@@ -26,7 +26,7 @@ func Load(name string) (riscv.Program, error) {
 		return nil, fmt.Errorf("data is not little-endian: %v", f.Data)
 	}
 
-	program := riscv.NewProgram(name, "riscv", "elf32", "little")
+	program := riscv.NewProgram(name, "riscv", "elf32", "little", uint32(f.Entry))
 
 	syms, err := f.Symbols()
 	if err != nil {
@@ -40,6 +40,10 @@ func Load(name string) (riscv.Program, error) {
 	}
 
 	for _, s := range f.Sections {
+		if s.Addr == 0 {
+			continue
+		}
+
 		// no program code
 		if s.Type&elf.SHT_PROGBITS == 0 {
 			continue
@@ -47,7 +51,7 @@ func Load(name string) (riscv.Program, error) {
 
 		// not executable
 		if s.Flags&elf.SHF_EXECINSTR == 0 {
-			continue
+			// data
 		}
 
 		section := riscv.NewSection(s.Name, uint32(s.Addr), uint32(s.Size/4))

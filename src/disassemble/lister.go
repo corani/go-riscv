@@ -8,11 +8,11 @@ import (
 func listProgram(program riscv.Program) {
 	list := lister.NewPrinter()
 
-	list.PrintLinef("\n\n; %v: file format %v-%v-%v\n\n",
+	list.PrintLinef("\n\n; %v: file format %v-%v-%v\n",
 		program.Name(), program.Class(), program.Order(), program.Machine())
 
 	for _, s := range program.Sections() {
-		list.PrintLinef("; Disassembly of section %v (%d instructions)\n",
+		list.PrintLinef("\n; Disassembly of section %v (%d instructions)\n",
 			s.Name(), s.Size())
 
 		r := s.Reader()
