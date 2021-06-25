@@ -31,6 +31,7 @@ type visitor struct {
 	verbose   bool
 	count     uint64
 	done      bool
+	exitCode  int
 }
 
 func (v *visitor) LoadSection(s riscv.Section) {
@@ -219,13 +220,18 @@ func (v *visitor) Ecall(i *riscv.Ecall) bool {
 
 	switch id {
 	case 93: // exit
-		v.list.PrintLinef("=> exit(%d)\n", v.registers[riscv.RegisterByName("a0")])
+		code := v.registers[riscv.RegisterByName("a0")]
+		v.list.PrintLinef("=> exit(%d)\n", code)
 
 		v.done = true
+		v.exitCode = int(code)
 	case 129: // kill
-		v.list.PrintLinef("=> kill(%d)\n", v.registers[riscv.RegisterByName("a0")])
+		code := v.registers[riscv.RegisterByName("a0")]
+
+		v.list.PrintLinef("=> kill(%d)\n", code)
 
 		v.done = true
+		v.exitCode = int(code)
 	default:
 		v.list.PrintLinef("=> ecall(%d)\n", id)
 	}

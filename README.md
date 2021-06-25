@@ -26,6 +26,13 @@ Emulates rv32i with zifenci and zicsr extensions.
 ./bin/emulate -in ./riscv-tests/isa/rv32ui-p-add
 ```
 
+To run the emulator for all the riscv-tests:
+
+```bash
+./build.sh
+./test.sh
+```
+
 ## Future
 
 - Complete emulator and get all tests to pass

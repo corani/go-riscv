@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"os"
 
 	"github.com/corani/go-riscv/src/elf"
 )
@@ -25,5 +26,5 @@ func main() {
 	program, err := elf.Load(name)
 	verify(err)
 
-	runProgram(program, iter)
+	os.Exit(runProgram(program, iter))
 }
