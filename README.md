@@ -26,6 +26,11 @@ Emulates rv32i with zifenci and zicsr extensions.
 ./bin/emulate -in ./riscv-tests/isa/rv32ui-p-add
 ```
 
+Additional command line arguments:
+
+- `-iter N` terminate after running `N` instructions (default=500)
+- `-v`      verbose logging, print the registers after each instruction
+
 To run the emulator for all the riscv-tests:
 
 ```bash

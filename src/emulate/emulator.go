@@ -6,8 +6,8 @@ import (
 	"github.com/corani/go-riscv/src/riscv"
 )
 
-func runProgram(p riscv.Program, iter int) int {
-	emulator := NewEmulator(false)
+func runProgram(p riscv.Program, verbose bool, iter int) int {
+	emulator := NewEmulator(verbose)
 
 	for _, s := range p.Sections() {
 		emulator.LoadSection(s)

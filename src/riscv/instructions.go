@@ -106,6 +106,10 @@ func (i *Branch) Target() uint32 {
 	return uint32(int64(i.Addr()) + int64(i.Imm()))
 }
 
+func (i *OpImm) Shamt() uint32 {
+	return uint32(i.Imm()) & 0b11111
+}
+
 func (i *System) Csr() string {
 	return CsrName(uint32(i.Imm()))
 }

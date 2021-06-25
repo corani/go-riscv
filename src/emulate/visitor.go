@@ -106,21 +106,25 @@ func (v *visitor) Auipc(i *riscv.Auipc) bool {
 }
 
 func (v *visitor) Jal(i *riscv.Jal) bool {
+	target := i.Target()
+
 	// return address
 	if i.Rd() != riscv.Register(0) {
 		v.setRegu(i.Rd(), v.pc+4)
 	}
 
-	return v.jump(i.Target())
+	return v.jump(target)
 }
 
 func (v *visitor) Jalr(i *riscv.Jalr) bool {
+	target := i.Target(v.getRegu(i.Rs1()))
+
 	// return address
 	if i.Rd() != riscv.Register(0) {
 		v.setRegu(i.Rd(), v.pc+4)
 	}
 
-	return v.jump(i.Target(v.getRegu(i.Rs1())))
+	return v.jump(target)
 }
 
 func (v *visitor) Beq(i *riscv.Beq) bool {
@@ -294,7 +298,9 @@ func (v *visitor) Sub(i *riscv.Sub) bool {
 }
 
 func (v *visitor) Sra(i *riscv.Sra) bool {
-	v.setReg(i.Rd(), v.getReg(i.Rs1())>>v.getReg(i.Rs2()))
+	shamt := v.getRegu(i.Rs2()) & 0b11111
+
+	v.setReg(i.Rd(), v.getReg(i.Rs1())>>shamt)
 
 	return true
 }
@@ -306,7 +312,9 @@ func (v *visitor) Add(i *riscv.Add) bool {
 }
 
 func (v *visitor) Sll(i *riscv.Sll) bool {
-	v.setRegu(i.Rd(), v.getRegu(i.Rs1())<<v.getRegu(i.Rs2()))
+	shamt := v.getRegu(i.Rs2()) & 0b11111
+
+	v.setRegu(i.Rd(), v.getRegu(i.Rs1())<<shamt)
 
 	return true
 }
@@ -338,7 +346,9 @@ func (v *visitor) Xor(i *riscv.Xor) bool {
 }
 
 func (v *visitor) Srl(i *riscv.Srl) bool {
-	v.setRegu(i.Rd(), v.getRegu(i.Rs1())>>v.getRegu(i.Rs2()))
+	shamt := v.getRegu(i.Rs2()) & 0b11111
+
+	v.setRegu(i.Rd(), v.getRegu(i.Rs1())>>shamt)
 
 	return true
 }
@@ -356,6 +366,8 @@ func (v *visitor) And(i *riscv.And) bool {
 }
 
 func (v *visitor) Srai(i *riscv.Srai) bool {
+	v.setReg(i.Rd(), v.getReg(i.Rs1())>>i.Shamt())
+
 	return true
 }
 
@@ -392,13 +404,13 @@ func (v *visitor) Xori(i *riscv.Xori) bool {
 }
 
 func (v *visitor) Slli(i *riscv.Slli) bool {
-	v.setRegu(i.Rd(), v.getRegu(i.Rs1())<<uint32(i.Imm()))
+	v.setRegu(i.Rd(), v.getRegu(i.Rs1())<<i.Shamt())
 
 	return true
 }
 
 func (v *visitor) Srli(i *riscv.Srli) bool {
-	v.setRegu(i.Rd(), v.getRegu(i.Rs1())>>uint32(i.Imm()))
+	v.setRegu(i.Rd(), v.getRegu(i.Rs1())>>i.Shamt())
 
 	return true
 }
@@ -432,8 +444,8 @@ func (v *visitor) setRegu(r riscv.Register, val uint32) {
 }
 
 func (v *visitor) getRegu(r riscv.Register) uint32 {
-	if r == riscv.Register(0) && v.registers[r] != 0 {
-		panic("getReg(0) was not zero")
+	if r == riscv.Register(0) {
+		return 0
 	}
 
 	return v.registers[r]

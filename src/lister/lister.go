@@ -404,7 +404,7 @@ func (v *visitor) And(i *riscv.And) bool {
 
 func (v *visitor) Srai(i *riscv.Srai) bool {
 	return v.printInstr(i, fmt.Sprintf("%-8s %s, %s, %d",
-		i.Mnemonic(), i.Rd(), i.Rs1(), i.Imm()))
+		i.Mnemonic(), i.Rd(), i.Rs1(), i.Shamt()))
 }
 
 func (v *visitor) Addi(i *riscv.Addi) bool {
@@ -452,17 +452,13 @@ func (v *visitor) Xori(i *riscv.Xori) bool {
 }
 
 func (v *visitor) Slli(i *riscv.Slli) bool {
-	shamt := uint8(i.Imm() & 0b11111)
-
 	return v.printInstr(i, fmt.Sprintf("%-8s %s, %s, %#x",
-		i.Mnemonic(), i.Rd(), i.Rs1(), shamt))
+		i.Mnemonic(), i.Rd(), i.Rs1(), i.Shamt()))
 }
 
 func (v *visitor) Srli(i *riscv.Srli) bool {
-	shamt := uint8(i.Imm() & 0b11111)
-
 	return v.printInstr(i, fmt.Sprintf("%-8s %s, %s, %#x",
-		i.Mnemonic(), i.Rd(), i.Rs1(), shamt))
+		i.Mnemonic(), i.Rd(), i.Rs1(), i.Shamt()))
 }
 
 func (v *visitor) Ori(i *riscv.Ori) bool {
