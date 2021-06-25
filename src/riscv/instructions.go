@@ -11,6 +11,7 @@ type Instruction interface {
 	NearestSymbol(addr uint32) string
 	Mnemonic() string
 	Visit(InstructionVisitor) bool
+	SetRaw(uint32)
 }
 
 type instruction struct {
@@ -110,6 +111,10 @@ func (i *Load) Mem(base uint32) uint32 {
 	return uint32(int64(base) + int64(i.Imm()))
 }
 
+func (i *Store) Mem(base uint32) uint32 {
+	return uint32(int64(base) + int64(i.Imm()))
+}
+
 func (i *OpImm) Shamt() uint32 {
 	return uint32(i.Imm()) & 0b11111
 }
@@ -132,6 +137,10 @@ func (i *instruction) Addr() uint32 {
 
 func (i *instruction) Raw() uint32 {
 	return i.raw
+}
+
+func (i *instruction) SetRaw(v uint32) {
+	i.raw = v
 }
 
 func (i *instruction) Sym() string {

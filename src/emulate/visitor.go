@@ -191,6 +191,17 @@ func (v *visitor) Load(addr uint32) uint32 {
 	}
 }
 
+func (v *visitor) Store(addr uint32, val uint32) {
+	// align to 4 bytes
+	base := addr & 0xfffffffc
+
+	if _, ok := v.inst[base]; ok {
+		v.inst[base].SetRaw(val)
+	} else {
+		panic(fmt.Sprintf("store mem out of range: %08x", base))
+	}
+}
+
 func (v *visitor) SignExtend(x uint32, l int) uint32 {
 	if x>>(l-1) == 1 {
 		return -((1 << l) - x)
@@ -290,14 +301,50 @@ func (v *visitor) Lhu(i *riscv.Lhu) bool {
 }
 
 func (v *visitor) Sb(i *riscv.Sb) bool {
+	addr := i.Mem(v.getRegu(i.Rs1()))
+
+	old := v.Load(addr)
+	data := v.getRegu(i.Rs2()) & 0xff
+
+	switch addr & 0x3 {
+	case 0:
+		old = (old & 0xffffff00) | data
+	case 1:
+		old = (old & 0xffff00ff) | (data << 8)
+	case 2:
+		old = (old & 0xff00ffff) | (data << 16)
+	case 3:
+		old = (old & 0x00ffffff) | (data << 24)
+	}
+
+	v.Store(addr, old)
+
 	return true
 }
 
 func (v *visitor) Sh(i *riscv.Sh) bool {
+	addr := i.Mem(v.getRegu(i.Rs1()))
+
+	old := v.Load(addr)
+	data := v.getRegu(i.Rs2()) & 0xffff
+
+	switch addr & 0x3 {
+	case 0:
+		old = (old & 0xffff0000) | data
+	case 2:
+		old = (old & 0x0000ffff) | (data << 16)
+	}
+
+	v.Store(addr, old)
+
 	return true
 }
 
 func (v *visitor) Sw(i *riscv.Sw) bool {
+	addr := i.Mem(v.getRegu(i.Rs1()))
+
+	v.Store(addr, v.getRegu(i.Rs2()))
+
 	return true
 }
 
