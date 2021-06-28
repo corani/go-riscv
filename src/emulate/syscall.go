@@ -64,7 +64,7 @@ func (v *visitor) Ecall(i *riscv.Ecall) bool {
 
 	call := SyscallByID(args[7])
 
-	v.profEcall[call.String()]++
+	v.profile.recordSyscall(call)
 
 	call.Execute(v, args)
 

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/corani/go-riscv/src/lister"
 	"github.com/corani/go-riscv/src/riscv"
@@ -12,8 +11,7 @@ func NewEmulator(verbose bool, entry uint32) *visitor {
 	result := &visitor{
 		registers: make(map[riscv.Register]uint32),
 		inst:      make(map[uint32]riscv.Instruction),
-		profInst:  make(map[string]uint),
-		profEcall: make(map[string]uint),
+		profile:   newProfile(),
 		pc:        entry,
 		list:      lister.NewPrinter(),
 		verbose:   verbose,
@@ -33,8 +31,7 @@ type visitor struct {
 	inst      map[uint32]riscv.Instruction
 	list      lister.Printer
 	verbose   bool
-	profInst  map[string]uint
-	profEcall map[string]uint
+	profile   *profile
 	count     uint64
 	done      bool
 	exitCode  int
@@ -91,7 +88,7 @@ func (v *visitor) Step() bool {
 		v.pc += 4
 	}
 
-	v.profInst[i.Mnemonic()]++
+	v.profile.recordInstruction(i)
 
 	if v.verbose {
 		v.printRegisters()
@@ -114,47 +111,6 @@ func (v *visitor) printRegisters() {
 	status += "\n|\n"
 
 	v.list.PrintLinef(status)
-}
-
-func (v *visitor) printProfile() {
-	type pair struct {
-		mnemonic string
-		count    uint
-	}
-
-	sortProfile := func(prof map[string]uint) []pair {
-		var pairs []pair
-
-		for k, c := range prof {
-			pairs = append(pairs, pair{k, c})
-		}
-
-		sort.Slice(pairs, func(i, j int) bool {
-			switch {
-			case pairs[i].count > pairs[j].count:
-				return true
-			case pairs[i].count < pairs[j].count:
-				return false
-			default:
-				return pairs[i].mnemonic < pairs[j].mnemonic
-			}
-		})
-
-		return pairs
-	}
-
-	v.list.PrintLinef("===== profile =====\n")
-	v.list.PrintLinef("instructions:\n")
-
-	for _, pair := range sortProfile(v.profInst) {
-		v.list.PrintLinef(" - %-08s: %4d\n", pair.mnemonic, pair.count)
-	}
-
-	v.list.PrintLinef("\necalls:\n")
-
-	for _, pair := range sortProfile(v.profEcall) {
-		v.list.PrintLinef(" - %-08s: %4d\n", pair.mnemonic, pair.count)
-	}
 }
 
 func (v *visitor) Unimp(i *riscv.Unimp) bool {

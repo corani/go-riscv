@@ -29,7 +29,7 @@ func runProgram(p riscv.Program, verbose bool, iter int) int {
 		emulator.exitCode = -1
 	}
 
-	emulator.printProfile()
+	emulator.list.PrintLinef(emulator.profile.String())
 
 	return emulator.exitCode
 }
