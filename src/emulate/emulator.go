@@ -4,27 +4,29 @@ import (
 	"github.com/corani/go-riscv/src/riscv"
 )
 
-func runProgram(p riscv.Program, verbose bool, iter int) int {
-	emulator := NewEmulator(verbose, p.Entry())
+func runProgram(p riscv.Program, verbose bool, gas int64) int {
+	emulator := NewEmulator(verbose, p.Entry(), gas)
 
 	for _, s := range p.Sections() {
 		emulator.LoadSection(s)
 	}
 
-	i := 0
-
-	for i < iter {
-		if !emulator.Step() {
-			break
-		}
-
-		i++
+	for emulator.Step() {
 	}
 
-	if i < iter {
-		emulator.list.PrintLinef("===== done =====\n\n")
+	if emulator.done {
+		emulator.list.PrintLinef("===== done =====\n")
+		emulator.list.PrintLinef("- gas used: %d/%d (left: %d)\n\n",
+			gas-emulator.gas, gas, emulator.gas)
 	} else {
-		emulator.list.PrintLinef("==== terminated ====\n\n")
+		emulator.list.PrintLinef("==== terminated ====\n")
+		if emulator.gas == 0 {
+			emulator.list.PrintLinef("- ran out of gas (%d)\n\n",
+				gas)
+		} else {
+			emulator.list.PrintLinef("- gas used: %d/%d\n\n",
+				gas-emulator.gas, gas)
+		}
 
 		emulator.exitCode = -1
 	}

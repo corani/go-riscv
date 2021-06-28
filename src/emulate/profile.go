@@ -73,22 +73,38 @@ func (p *profile) String() string {
 		return pairs
 	}
 
-	res := "===== profile =====\n"
-
-	if len(p.inst) > 0 {
-		res += "instructions:\n"
-
-		for _, pair := range sortProfile(p.inst) {
-			res += fmt.Sprintf(" - %-08s: %4d\n", pair.mnemonic, pair.count)
+	separator := func(i int) string {
+		if i == 0 {
+			return "\n| "
+		} else if i%4 == 0 {
+			return " |\n| "
+		} else {
+			return " | "
 		}
 	}
 
-	if len(p.ecall) > 0 {
-		res += "\nsyscalls:\n"
+	res := "===== profile =====\n"
 
-		for _, pair := range sortProfile(p.ecall) {
-			res += fmt.Sprintf(" - %-08s: %4d\n", pair.mnemonic, pair.count)
+	if len(p.inst) > 0 {
+		res += "instructions:"
+
+		for i, pair := range sortProfile(p.inst) {
+			res += separator(i)
+			res += fmt.Sprintf("%-08s: %4d", pair.mnemonic, pair.count)
 		}
+
+		res += " |\n"
+	}
+
+	if len(p.ecall) > 0 {
+		res += "\nsyscalls:"
+
+		for i, pair := range sortProfile(p.ecall) {
+			res += separator(i)
+			res += fmt.Sprintf("%-08s: %4d", pair.mnemonic, pair.count)
+		}
+
+		res += " |\n"
 	}
 
 	res += "\nmemory:\n"

@@ -9,7 +9,7 @@ import (
 type Syscall interface {
 	fmt.Stringer
 
-	Execute(*visitor, []uint32)
+	Execute(*visitor, []uint32) uint
 }
 
 type syscall struct {
@@ -43,8 +43,10 @@ func (s *syscall) String() string {
 	return s.name
 }
 
-func (s *syscall) Execute(v *visitor, args []uint32) {
+func (s *syscall) Execute(v *visitor, args []uint32) uint {
 	v.list.PrintLinef("=> ecall(%d)\n", s.id)
+
+	return 0
 }
 
 func (v *visitor) getEcallArgs() []uint32 {
@@ -66,37 +68,43 @@ func (v *visitor) Ecall(i *riscv.Ecall) bool {
 
 	v.profile.recordSyscall(call)
 
-	call.Execute(v, args)
+	gas := call.Execute(v, args)
+
+	v.gas -= int64(gas)
 
 	return true
 }
 
-func (s *SyscallExit) Execute(v *visitor, args []uint32) {
+func (s *SyscallExit) Execute(v *visitor, args []uint32) uint {
 	code := args[0]
 
 	v.done = true
 	v.exitCode = int(code)
 
 	v.list.PrintLinef("=> exit(%d)\n", code)
+
+	return 0
 }
 
-func (s *SyscallKill) Execute(v *visitor, args []uint32) {
+func (s *SyscallKill) Execute(v *visitor, args []uint32) uint {
 	code := args[0]
 
 	v.done = true
 	v.exitCode = int(code)
 
 	v.list.PrintLinef("=> kill(%d)\n", code)
+
+	return 0
 }
 
-func (s *SyscallWrite) Execute(v *visitor, args []uint32) {
+func (s *SyscallWrite) Execute(v *visitor, args []uint32) uint {
 	fd := args[0]
 	buf := args[1]
 	count := args[2]
 
 	section := v.SectionFor(buf)
 	if section == nil {
-		return
+		return 0
 	}
 
 	buf -= section.Base()
@@ -105,4 +113,8 @@ func (s *SyscallWrite) Execute(v *visitor, args []uint32) {
 	_ = fd
 
 	fmt.Print(string(bs))
+
+	v.profile.loadedBytes += uint(count)
+
+	return uint(count)
 }

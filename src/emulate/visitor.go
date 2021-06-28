@@ -7,11 +7,12 @@ import (
 	"github.com/corani/go-riscv/src/riscv"
 )
 
-func NewEmulator(verbose bool, entry uint32) *visitor {
+func NewEmulator(verbose bool, entry uint32, gas int64) *visitor {
 	result := &visitor{
 		registers: make(map[riscv.Register]uint32),
 		inst:      make(map[uint32]riscv.Instruction),
 		profile:   newProfile(),
+		gas:       gas,
 		pc:        entry,
 		list:      lister.NewPrinter(),
 		verbose:   verbose,
@@ -26,6 +27,7 @@ func NewEmulator(verbose bool, entry uint32) *visitor {
 
 type visitor struct {
 	pc        uint32
+	gas       int64
 	sections  []riscv.Section
 	registers map[riscv.Register]uint32
 	inst      map[uint32]riscv.Instruction
@@ -81,7 +83,7 @@ func (v *visitor) Step() bool {
 	i := v.Current()
 	v.count++
 
-	v.list.PrintLinef("===== %04d =====\n", v.count)
+	v.list.PrintLinef("===== %04d (gas: %04d) =====\n", v.count, v.gas)
 	v.list.PrintInstruction(i)
 
 	if i.Visit(v) {
@@ -94,7 +96,9 @@ func (v *visitor) Step() bool {
 		v.printRegisters()
 	}
 
-	return !v.done
+	v.gas--
+
+	return !v.done && v.gas > 0
 }
 
 func (v *visitor) printRegisters() {
