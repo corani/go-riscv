@@ -107,12 +107,11 @@ func (s *SyscallWrite) Execute(v *visitor, args []uint32) uint {
 		return 0
 	}
 
-	buf -= section.Base()
-	bs := section.GetBytes(buf, count)
+	bs := section.MemAt(buf)
 
 	_ = fd
 
-	fmt.Print(string(bs))
+	fmt.Print(string(bs[0:count]))
 
 	v.profile.loadedBytes += uint(count)
 

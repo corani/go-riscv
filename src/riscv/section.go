@@ -1,6 +1,7 @@
 package riscv
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math"
 )
@@ -9,14 +10,12 @@ type Section interface {
 	Name() string
 	Base() uint32
 	Size() uint32
-	Data() *[]uint32
+	MemAt(uint32) []byte
 	AddSymbol(uint32, string)
-	SymbolAtAddr(uint32) (string, bool)
-	NearestSymbol(uint32) string
-	SymbolForIndex(uint32) (string, bool)
-	AddrForIndex(uint32) uint32
+	SymbolAt(uint32) (string, bool)
+	SymbolBefore(uint32) string
+	InstructionAt(uint32) Instruction
 	Reader() SectionReader
-	GetBytes(addr, count uint32) []byte
 }
 
 type SectionReader interface {
@@ -25,7 +24,7 @@ type SectionReader interface {
 
 type sectionReader struct {
 	section *section
-	index   uint32
+	pc      uint32
 }
 
 type section struct {
@@ -33,7 +32,7 @@ type section struct {
 	base    uint32
 	size    uint32
 	symbols map[uint32]string
-	data    []uint32
+	raw     []byte
 }
 
 func NewSection(name string, base, size uint32) Section {
@@ -41,7 +40,7 @@ func NewSection(name string, base, size uint32) Section {
 		name:    name,
 		base:    base,
 		size:    size,
-		data:    make([]uint32, size),
+		raw:     make([]byte, size),
 		symbols: make(map[uint32]string),
 	}
 }
@@ -58,20 +57,28 @@ func (s *section) Size() uint32 {
 	return s.size
 }
 
-func (s *section) Data() *[]uint32 {
-	return &s.data
+func (s *section) MemAt(addr uint32) []byte {
+	return s.raw[addr-s.base:]
 }
 
 func (s *section) AddSymbol(addr uint32, name string) {
 	s.symbols[addr] = name
 }
 
-func (s *section) SymbolAtAddr(addr uint32) (string, bool) {
+func (s *section) SymbolAt(addr uint32) (string, bool) {
 	sym, ok := s.symbols[addr]
+
 	return sym, ok
 }
 
-func (s *section) NearestSymbol(addr uint32) string {
+func (s *section) InstructionAt(addr uint32) Instruction {
+	sym, _ := s.SymbolAt(addr)
+	raw := binary.LittleEndian.Uint32(s.raw[(addr - s.base):])
+
+	return decodeInstruction(s, addr, raw, sym)
+}
+
+func (s *section) SymbolBefore(addr uint32) string {
 	offset := uint32(math.MaxUint32)
 	sym := ""
 
@@ -89,65 +96,18 @@ func (s *section) NearestSymbol(addr uint32) string {
 	return fmt.Sprintf("<%s+%#x>", sym, offset)
 }
 
-func (s *section) SymbolForIndex(i uint32) (string, bool) {
-	addr := s.AddrForIndex(i)
-
-	sym, ok := s.symbols[addr]
-	return sym, ok
-}
-
-func (s *section) AddrForIndex(i uint32) uint32 {
-	return s.base + i*4
-}
-
-func (s *section) GetBytes(addr, count uint32) []byte {
-	getByte := func(addr uint32) byte {
-		base := addr & 0xfffffffc
-
-		w := s.data[base>>2]
-
-		switch addr & 0x3 {
-		case 0:
-			return byte((w >> 0) & 0xff)
-		case 1:
-			return byte((w >> 8) & 0xff)
-		case 2:
-			return byte((w >> 16) & 0xff)
-		case 3:
-			return byte((w >> 24) & 0xff)
-		}
-
-		return 0
-	}
-
-	var result []byte
-
-	for i := uint32(0); i < count; i++ {
-		result = append(result, getByte(addr+i))
-	}
-
-	return result
-}
-
 func (s *section) Reader() SectionReader {
-	return &sectionReader{
-		section: s,
-		index:   0,
-	}
+	return &sectionReader{section: s}
 }
 
 func (r *sectionReader) Next() Instruction {
-	if int(r.index) >= len(r.section.data) {
+	if int(r.pc) >= len(r.section.raw) {
 		return nil
 	}
 
-	sym, _ := r.section.SymbolForIndex(r.index)
-	addr := r.section.AddrForIndex(r.index)
-	raw := r.section.data[r.index]
+	inst := r.section.InstructionAt(r.pc + r.section.base)
 
-	inst := decodeInstruction(r.section, addr, raw, sym)
-
-	r.index++
+	r.pc += 4
 
 	return inst
 }

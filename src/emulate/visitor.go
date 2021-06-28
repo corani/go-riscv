@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 
 	"github.com/corani/go-riscv/src/lister"
@@ -10,7 +11,6 @@ import (
 func NewEmulator(verbose bool, entry uint32, gas int64) *visitor {
 	result := &visitor{
 		registers: make(map[riscv.Register]uint32),
-		inst:      make(map[uint32]riscv.Instruction),
 		profile:   newProfile(),
 		gas:       gas,
 		pc:        entry,
@@ -30,7 +30,6 @@ type visitor struct {
 	gas       int64
 	sections  []riscv.Section
 	registers map[riscv.Register]uint32
-	inst      map[uint32]riscv.Instruction
 	list      lister.Printer
 	verbose   bool
 	profile   *profile
@@ -47,13 +46,11 @@ func (v *visitor) LoadSection(s riscv.Section) {
 
 	v.sections = append(v.sections, s)
 
-	r := s.Reader()
-	for i := r.Next(); i != nil; i = r.Next() {
-		if v.verbose {
+	if v.verbose {
+		r := s.Reader()
+		for i := r.Next(); i != nil; i = r.Next() {
 			v.list.PrintInstruction(i)
 		}
-
-		v.inst[i.Addr()] = i
 	}
 }
 
@@ -62,11 +59,9 @@ func (v *visitor) PC() uint32 {
 }
 
 func (v *visitor) Current() riscv.Instruction {
-	if v, ok := v.inst[v.pc]; ok {
-		return v
-	}
+	section := v.SectionFor(v.pc)
 
-	return nil
+	return section.InstructionAt(v.pc)
 }
 
 func (v *visitor) SectionFor(addr uint32) riscv.Section {
@@ -203,26 +198,10 @@ func (v *visitor) Bgeu(i *riscv.Bgeu) bool {
 	return true
 }
 
-func (v *visitor) Load(addr uint32) uint32 {
-	// align to 4 bytes
-	base := addr & 0xfffffffc
+func (v *visitor) Mem(addr uint32) []byte {
+	section := v.SectionFor(addr)
 
-	if data, ok := v.inst[base]; ok {
-		return data.Raw()
-	} else {
-		panic(fmt.Sprintf("load mem out of range: %08x", base))
-	}
-}
-
-func (v *visitor) Store(addr uint32, val uint32) {
-	// align to 4 bytes
-	base := addr & 0xfffffffc
-
-	if _, ok := v.inst[base]; ok {
-		v.inst[base].SetRaw(val)
-	} else {
-		panic(fmt.Sprintf("store mem out of range: %08x", base))
-	}
+	return section.MemAt(addr)
 }
 
 func (v *visitor) SignExtend(x uint32, l int) uint32 {
@@ -236,19 +215,7 @@ func (v *visitor) SignExtend(x uint32, l int) uint32 {
 func (v *visitor) Lb(i *riscv.Lb) bool {
 	addr := i.Mem(v.getRegu(i.Rs1()))
 
-	data := v.Load(addr)
-
-	switch addr & 0x3 {
-	case 0:
-	case 1:
-		data >>= 8
-	case 2:
-		data >>= 16
-	case 3:
-		data >>= 24
-	}
-
-	data &= 0xff
+	data := uint32(v.Mem(addr)[0])
 	data = v.SignExtend(data, 8)
 
 	v.setRegu(i.Rd(), data)
@@ -259,15 +226,7 @@ func (v *visitor) Lb(i *riscv.Lb) bool {
 func (v *visitor) Lh(i *riscv.Lh) bool {
 	addr := i.Mem(v.getRegu(i.Rs1()))
 
-	data := v.Load(addr)
-
-	switch addr & 0x3 {
-	case 0:
-	case 2:
-		data >>= 16
-	}
-
-	data &= 0xffff
+	data := uint32(binary.LittleEndian.Uint16(v.Mem(addr)))
 	data = v.SignExtend(data, 16)
 
 	v.setRegu(i.Rd(), data)
@@ -278,7 +237,9 @@ func (v *visitor) Lh(i *riscv.Lh) bool {
 func (v *visitor) Lw(i *riscv.Lw) bool {
 	addr := i.Mem(v.getRegu(i.Rs1()))
 
-	v.setRegu(i.Rd(), v.Load(addr))
+	data := binary.LittleEndian.Uint32(v.Mem(addr))
+
+	v.setRegu(i.Rd(), data)
 
 	return true
 }
@@ -286,19 +247,7 @@ func (v *visitor) Lw(i *riscv.Lw) bool {
 func (v *visitor) Lbu(i *riscv.Lbu) bool {
 	addr := i.Mem(v.getRegu(i.Rs1()))
 
-	data := v.Load(addr)
-
-	switch addr & 0x3 {
-	case 0:
-	case 1:
-		data >>= 8
-	case 2:
-		data >>= 16
-	case 3:
-		data >>= 24
-	}
-
-	data &= 0xff
+	data := uint32(v.Mem(addr)[0])
 
 	v.setRegu(i.Rd(), data)
 
@@ -308,15 +257,7 @@ func (v *visitor) Lbu(i *riscv.Lbu) bool {
 func (v *visitor) Lhu(i *riscv.Lhu) bool {
 	addr := i.Mem(v.getRegu(i.Rs1()))
 
-	data := v.Load(addr)
-
-	switch addr & 0x3 {
-	case 0:
-	case 2:
-		data >>= 16
-	}
-
-	data &= 0xffff
+	data := uint32(binary.LittleEndian.Uint16(v.Mem(addr)))
 
 	v.setRegu(i.Rd(), data)
 
@@ -325,48 +266,27 @@ func (v *visitor) Lhu(i *riscv.Lhu) bool {
 
 func (v *visitor) Sb(i *riscv.Sb) bool {
 	addr := i.Mem(v.getRegu(i.Rs1()))
+	data := v.getRegu(i.Rs2())
 
-	old := v.Load(addr)
-	data := v.getRegu(i.Rs2()) & 0xff
-
-	switch addr & 0x3 {
-	case 0:
-		old = (old & 0xffffff00) | data
-	case 1:
-		old = (old & 0xffff00ff) | (data << 8)
-	case 2:
-		old = (old & 0xff00ffff) | (data << 16)
-	case 3:
-		old = (old & 0x00ffffff) | (data << 24)
-	}
-
-	v.Store(addr, old)
+	v.Mem(addr)[0] = byte(data & 0xff)
 
 	return true
 }
 
 func (v *visitor) Sh(i *riscv.Sh) bool {
 	addr := i.Mem(v.getRegu(i.Rs1()))
+	data := uint16(v.getRegu(i.Rs2()) & 0xffff)
 
-	old := v.Load(addr)
-	data := v.getRegu(i.Rs2()) & 0xffff
-
-	switch addr & 0x3 {
-	case 0:
-		old = (old & 0xffff0000) | data
-	case 2:
-		old = (old & 0x0000ffff) | (data << 16)
-	}
-
-	v.Store(addr, old)
+	binary.LittleEndian.PutUint16(v.Mem(addr), data)
 
 	return true
 }
 
 func (v *visitor) Sw(i *riscv.Sw) bool {
 	addr := i.Mem(v.getRegu(i.Rs1()))
+	data := v.getRegu(i.Rs2())
 
-	v.Store(addr, v.getRegu(i.Rs2()))
+	binary.LittleEndian.PutUint32(v.Mem(addr), data)
 
 	return true
 }

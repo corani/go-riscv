@@ -54,7 +54,7 @@ func Load(name string) (riscv.Program, error) {
 			// data
 		}
 
-		section := riscv.NewSection(s.Name, uint32(s.Addr), uint32(s.Size/4))
+		section := riscv.NewSection(s.Name, uint32(s.Addr), uint32(s.Size))
 
 		for k, v := range symbols {
 			if uint64(k) >= s.Addr && uint64(k) <= s.Addr+s.Size {
@@ -62,7 +62,7 @@ func Load(name string) (riscv.Program, error) {
 			}
 		}
 
-		if err := binary.Read(s.Open(), binary.LittleEndian, section.Data()); err != nil {
+		if err := binary.Read(s.Open(), binary.LittleEndian, section.MemAt(uint32(s.Addr))); err != nil {
 			return nil, err
 		}
 

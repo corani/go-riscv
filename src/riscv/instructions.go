@@ -186,5 +186,5 @@ func (i *instruction) bits(s, e int) uint32 {
 }
 
 func (i *instruction) NearestSymbol(addr uint32) string {
-	return i.section.NearestSymbol(addr)
+	return i.section.SymbolBefore(addr)
 }
