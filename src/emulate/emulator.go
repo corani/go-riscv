@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/corani/go-riscv/src/riscv"
 )
 
@@ -17,13 +15,21 @@ func runProgram(p riscv.Program, verbose bool, iter int) int {
 
 	for i < iter {
 		if !emulator.Step() {
-			return emulator.exitCode
+			break
 		}
 
 		i++
 	}
 
-	fmt.Println("==== terminated ====")
+	if i < iter {
+		emulator.list.PrintLinef("===== done =====\n\n")
+	} else {
+		emulator.list.PrintLinef("==== terminated ====\n\n")
 
-	return -1
+		emulator.exitCode = -1
+	}
+
+	emulator.printProfile()
+
+	return emulator.exitCode
 }

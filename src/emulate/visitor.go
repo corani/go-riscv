@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/corani/go-riscv/src/lister"
 	"github.com/corani/go-riscv/src/riscv"
@@ -11,12 +12,12 @@ func NewEmulator(verbose bool, entry uint32) *visitor {
 	result := &visitor{
 		registers: make(map[riscv.Register]uint32),
 		inst:      make(map[uint32]riscv.Instruction),
+		profInst:  make(map[string]uint),
+		profEcall: make(map[string]uint),
 		pc:        entry,
 		list:      lister.NewPrinter(),
 		verbose:   verbose,
 	}
-
-	result.syscall = &syscall{v: result}
 
 	for i := 0; i < 32; i++ {
 		result.registers[riscv.Register(0)] = 0
@@ -31,8 +32,9 @@ type visitor struct {
 	registers map[riscv.Register]uint32
 	inst      map[uint32]riscv.Instruction
 	list      lister.Printer
-	syscall   *syscall
 	verbose   bool
+	profInst  map[string]uint
+	profEcall map[string]uint
 	count     uint64
 	done      bool
 	exitCode  int
@@ -89,29 +91,70 @@ func (v *visitor) Step() bool {
 		v.pc += 4
 	}
 
+	v.profInst[i.Mnemonic()]++
+
 	if v.verbose {
-		status := fmt.Sprintf("|\n|\t pc=%#8x", v.pc)
+		v.printRegisters()
+	}
 
-		for r := 1; r < 32; r++ {
-			if r%8 == 0 {
-				status += "\n|"
-			}
+	return !v.done
+}
 
-			status += fmt.Sprintf("\t%3s=%#08x", riscv.Register(r), v.registers[riscv.Register(r)])
+func (v *visitor) printRegisters() {
+	status := fmt.Sprintf("|\n|\t pc=%#8x", v.pc)
+
+	for r := 1; r < 32; r++ {
+		if r%8 == 0 {
+			status += "\n|"
 		}
 
-		status += "\n|\n"
-
-		v.list.PrintLinef(status)
+		status += fmt.Sprintf("\t%3s=%#08x", riscv.Register(r), v.registers[riscv.Register(r)])
 	}
 
-	if v.done {
-		v.list.PrintLinef("===== done =====\n\n")
+	status += "\n|\n"
 
-		return false
+	v.list.PrintLinef(status)
+}
+
+func (v *visitor) printProfile() {
+	type pair struct {
+		mnemonic string
+		count    uint
 	}
 
-	return true
+	sortProfile := func(prof map[string]uint) []pair {
+		var pairs []pair
+
+		for k, c := range prof {
+			pairs = append(pairs, pair{k, c})
+		}
+
+		sort.Slice(pairs, func(i, j int) bool {
+			switch {
+			case pairs[i].count > pairs[j].count:
+				return true
+			case pairs[i].count < pairs[j].count:
+				return false
+			default:
+				return pairs[i].mnemonic < pairs[j].mnemonic
+			}
+		})
+
+		return pairs
+	}
+
+	v.list.PrintLinef("===== profile =====\n")
+	v.list.PrintLinef("instructions:\n")
+
+	for _, pair := range sortProfile(v.profInst) {
+		v.list.PrintLinef(" - %-08s: %4d\n", pair.mnemonic, pair.count)
+	}
+
+	v.list.PrintLinef("\necalls:\n")
+
+	for _, pair := range sortProfile(v.profEcall) {
+		v.list.PrintLinef(" - %-08s: %4d\n", pair.mnemonic, pair.count)
+	}
 }
 
 func (v *visitor) Unimp(i *riscv.Unimp) bool {
