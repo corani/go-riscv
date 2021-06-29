@@ -8,7 +8,7 @@ import (
 	"github.com/corani/go-riscv/src/riscv"
 )
 
-func NewEmulator(verbose bool, entry uint32, gas int64) *visitor {
+func NewEmulator(verbose int, entry uint32, gas int64) *visitor {
 	result := &visitor{
 		registers: make(map[riscv.Register]uint32),
 		profile:   newProfile(),
@@ -31,7 +31,7 @@ type visitor struct {
 	sections  []riscv.Section
 	registers map[riscv.Register]uint32
 	list      lister.Printer
-	verbose   bool
+	verbose   int
 	profile   *profile
 	count     uint64
 	done      bool
@@ -39,19 +39,17 @@ type visitor struct {
 }
 
 func (v *visitor) LoadSection(s riscv.Section) {
-	if v.verbose {
+	if v.verbose > 2 {
 		v.list.PrintLinef("\n; Disassembly of section %s (base=%08x, size=%d)\n",
 			s.Name(), s.Base(), s.Size())
-	}
 
-	v.sections = append(v.sections, s)
-
-	if v.verbose {
 		r := s.Reader()
 		for i := r.Next(); i != nil; i = r.Next() {
 			v.list.PrintInstruction(i)
 		}
 	}
+
+	v.sections = append(v.sections, s)
 }
 
 func (v *visitor) PC() uint32 {
@@ -78,8 +76,10 @@ func (v *visitor) Step() bool {
 	i := v.Current()
 	v.count++
 
-	v.list.PrintLinef("===== %04d (gas: %04d) =====\n", v.count, v.gas)
-	v.list.PrintInstruction(i)
+	if v.verbose > 2 {
+		v.list.PrintLinef("===== %04d (gas: %04d) =====\n", v.count, v.gas)
+		v.list.PrintInstruction(i)
+	}
 
 	if i.Visit(v) {
 		v.pc += 4
@@ -87,7 +87,7 @@ func (v *visitor) Step() bool {
 
 	v.profile.recordInstruction(i)
 
-	if v.verbose {
+	if v.verbose > 3 {
 		v.printRegisters()
 	}
 
