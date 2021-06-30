@@ -13,7 +13,7 @@ Playing around with Risc-V in Go.
 Disassembles rv32i with zifenci and zicsr extensions.
 
 ```bash
-./build.sh
+make
 ./bin/disassemble -in ./riscv-tests/isa/rv32ui-p-simple
 ```
 
@@ -22,7 +22,7 @@ Disassembles rv32i with zifenci and zicsr extensions.
 Emulates rv32i with zifenci and zicsr extensions.
 
 ```bash
-./build.sh
+make
 ./bin/emulate -in ./riscv-tests/isa/rv32ui-p-add
 ```
 
@@ -34,13 +34,15 @@ Additional command line arguments:
 To run the emulator for all the riscv-tests:
 
 ```bash
-./build.sh
-./test.sh
+make riscv-tests
 ```
 
 ## Future
 
-- Emulator: remove memory hack
+- Emulator
+  - Memory mapped I/O
+  - Proper trapping of ecalls
+  - Dynamic memory
 - Create an assembler
 - Create a debugger
 - Support rv32g: rv32m (mul/div) + rv32a (atomic) + rv32f (float) + rv32d (double)?
