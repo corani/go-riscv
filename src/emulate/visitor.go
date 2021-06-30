@@ -39,7 +39,7 @@ type visitor struct {
 }
 
 func (v *visitor) LoadSection(s riscv.Section) {
-	if v.verbose > 2 {
+	if v.verbose > 1 {
 		v.list.PrintLinef("\n; Disassembly of section %s (base=%08x, size=%d)\n",
 			s.Name(), s.Base(), s.Size())
 
@@ -76,7 +76,7 @@ func (v *visitor) Step() bool {
 	i := v.Current()
 	v.count++
 
-	if v.verbose > 2 {
+	if v.verbose > 3 {
 		v.list.PrintLinef("===== %04d (gas: %04d) =====\n", v.count, v.gas)
 		v.list.PrintInstruction(i)
 	}
@@ -87,7 +87,7 @@ func (v *visitor) Step() bool {
 
 	v.profile.recordInstruction(i)
 
-	if v.verbose > 3 {
+	if v.verbose > 4 {
 		v.printRegisters()
 	}
 

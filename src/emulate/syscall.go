@@ -84,7 +84,7 @@ func (s *SyscallExit) Execute(v *visitor, args []uint32) uint {
 	v.done = true
 	v.exitCode = int(code)
 
-	if v.verbose > 1 {
+	if v.verbose > 2 {
 		v.list.PrintLinef("=> exit(%d)\n", code)
 	}
 
@@ -97,7 +97,7 @@ func (s *SyscallKill) Execute(v *visitor, args []uint32) uint {
 	v.done = true
 	v.exitCode = int(code)
 
-	if v.verbose > 1 {
+	if v.verbose > 2 {
 		v.list.PrintLinef("=> kill(%d)\n", code)
 	}
 
@@ -109,7 +109,7 @@ func (s *SyscallRead) Execute(v *visitor, args []uint32) uint {
 	buf := args[1]
 	count := args[2]
 
-	if v.verbose > 1 {
+	if v.verbose > 2 {
 		v.list.PrintLinef("=> read(%d, %08x, %d)\n", fd, buf, count)
 	}
 
@@ -155,7 +155,7 @@ func (s *SyscallWrite) Execute(v *visitor, args []uint32) uint {
 	buf := args[1]
 	count := args[2]
 
-	if v.verbose > 1 {
+	if v.verbose > 2 {
 		v.list.PrintLinef("=> write(%d, %08x, %d)\n", fd, buf, count)
 	}
 
