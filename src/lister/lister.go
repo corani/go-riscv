@@ -201,17 +201,17 @@ func (v *visitor) Lhu(i *riscv.Lhu) bool {
 }
 
 func (v *visitor) Sb(i *riscv.Sb) bool {
-	return v.printInstr(i, fmt.Sprintf("%-4s %s, %d(%s)",
+	return v.printInstr(i, fmt.Sprintf("%-8s %s, %d(%s)",
 		i.Mnemonic(), i.Rs2(), i.Imm(), i.Rs1()))
 }
 
 func (v *visitor) Sh(i *riscv.Sh) bool {
-	return v.printInstr(i, fmt.Sprintf("%-4s %s, %d(%s)",
+	return v.printInstr(i, fmt.Sprintf("%-8s %s, %d(%s)",
 		i.Mnemonic(), i.Rs2(), i.Imm(), i.Rs1()))
 }
 
 func (v *visitor) Sw(i *riscv.Sw) bool {
-	return v.printInstr(i, fmt.Sprintf("%-4s %s, %d(%s)",
+	return v.printInstr(i, fmt.Sprintf("%-8s %s, %d(%s)",
 		i.Mnemonic(), i.Rs2(), i.Imm(), i.Rs1()))
 }
 

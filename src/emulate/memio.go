@@ -51,7 +51,7 @@ func (m *memio) Read(addr, size uint32) []byte {
 
 	switch addr {
 	case memioReadStdin:
-		buf := []byte{0}
+		buf := make([]byte, 1)
 
 		os.Stdin.Read(buf)
 
