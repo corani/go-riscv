@@ -215,7 +215,12 @@ func decodeInstruction(section Section, addr, raw uint32, sym string) Instructio
 				return &Hfence{system(i, "hfence.gvma")}
 			}
 		case func3CSRRW:
-			return &Csrrw{system(i, "csrrw")}
+			// 0xc0001073 = CSRRW x0, cycle, x0. Since cycle is a read-only CSR, this will generate
+			// an illegal instruction exception. Therefor the UNIMP mnemonic is commonly translated
+			// into this instruction.
+			if i.Raw() != uint32(0xc0001073) {
+				return &Csrrw{system(i, "csrrw")}
+			}
 		case func3CSRRS:
 			return &Csrrs{system(i, "csrrs")}
 		case func3CSRRC:
