@@ -18,6 +18,8 @@ func NewEmulator(verbose int, entry uint32, gas int64) *visitor {
 		verbose:   verbose,
 	}
 
+	result.sections = append(result.sections, NewMemIO(0x1000_0000))
+
 	for i := 0; i < 32; i++ {
 		result.registers[riscv.Register(0)] = 0
 	}
@@ -38,18 +40,31 @@ type visitor struct {
 	exitCode  int
 }
 
-func (v *visitor) LoadSection(s riscv.Section) {
+func (v *visitor) LoadSection(section riscv.Section) {
+	for _, s := range v.sections {
+		if section.Base() < s.Base()+s.Size() &&
+			section.Base()+section.Size() > s.Base() {
+			v.list.PrintLinef(
+				"\n; section %s (base=%08x, size=%d) overlaps section %s (base=%08x, size=%d)\n",
+				section.Name(), section.Base(), section.Size(),
+				s.Name(), s.Base(), s.Size(),
+			)
+
+			return
+		}
+	}
+
 	if v.verbose > 1 {
 		v.list.PrintLinef("\n; Disassembly of section %s (base=%08x, size=%d)\n",
-			s.Name(), s.Base(), s.Size())
+			section.Name(), section.Base(), section.Size())
 
-		r := s.Reader()
+		r := section.Reader()
 		for i := r.Next(); i != nil; i = r.Next() {
 			v.list.PrintInstruction(i)
 		}
 	}
 
-	v.sections = append(v.sections, s)
+	v.sections = append(v.sections, section)
 }
 
 func (v *visitor) PC() uint32 {
@@ -514,7 +529,9 @@ func (v *visitor) Andi(i *riscv.Andi) bool {
 }
 
 func (v *visitor) jump(addr uint32) bool {
-	v.list.PrintLinef("| => took branch\n")
+	if v.verbose > 4 {
+		v.list.PrintLinef("| => took branch\n")
+	}
 
 	v.pc = addr
 
