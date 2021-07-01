@@ -10,7 +10,8 @@ type Section interface {
 	Name() string
 	Base() uint32
 	Size() uint32
-	MemAt(uint32) []byte
+	Read(addr, size uint32) []byte
+	Write(addr uint32, data []byte)
 	AddSymbol(uint32, string)
 	SymbolAt(uint32) (string, bool)
 	SymbolBefore(uint32) string
@@ -57,8 +58,14 @@ func (s *section) Size() uint32 {
 	return s.size
 }
 
-func (s *section) MemAt(addr uint32) []byte {
-	return s.raw[addr-s.base:]
+func (s *section) Read(addr, size uint32) []byte {
+	base := addr - s.base
+
+	return s.raw[base : base+size]
+}
+
+func (s *section) Write(addr uint32, data []byte) {
+	copy(s.raw[addr-s.base:], data)
 }
 
 func (s *section) AddSymbol(addr uint32, name string) {

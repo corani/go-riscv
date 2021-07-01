@@ -198,10 +198,16 @@ func (v *visitor) Bgeu(i *riscv.Bgeu) bool {
 	return true
 }
 
-func (v *visitor) Mem(addr uint32) []byte {
+func (v *visitor) Read(addr uint32, size uint32) []byte {
 	section := v.SectionFor(addr)
 
-	return section.MemAt(addr)
+	return section.Read(addr, size)
+}
+
+func (v *visitor) Write(addr uint32, data []byte) {
+	section := v.SectionFor(addr)
+
+	section.Write(addr, data)
 }
 
 func (v *visitor) SignExtend(x uint32, l int) uint32 {
@@ -215,7 +221,9 @@ func (v *visitor) SignExtend(x uint32, l int) uint32 {
 func (v *visitor) Lb(i *riscv.Lb) bool {
 	addr := i.Mem(v.getRegu(i.Rs1()))
 
-	data := uint32(v.Mem(addr)[0])
+	bs := v.Read(addr, 1)
+
+	data := uint32(bs[0])
 	data = v.SignExtend(data, 8)
 
 	v.setRegu(i.Rd(), data)
@@ -226,7 +234,9 @@ func (v *visitor) Lb(i *riscv.Lb) bool {
 func (v *visitor) Lh(i *riscv.Lh) bool {
 	addr := i.Mem(v.getRegu(i.Rs1()))
 
-	data := uint32(binary.LittleEndian.Uint16(v.Mem(addr)))
+	bs := v.Read(addr, 2)
+
+	data := uint32(binary.LittleEndian.Uint16(bs))
 	data = v.SignExtend(data, 16)
 
 	v.setRegu(i.Rd(), data)
@@ -237,7 +247,9 @@ func (v *visitor) Lh(i *riscv.Lh) bool {
 func (v *visitor) Lw(i *riscv.Lw) bool {
 	addr := i.Mem(v.getRegu(i.Rs1()))
 
-	data := binary.LittleEndian.Uint32(v.Mem(addr))
+	bs := v.Read(addr, 4)
+
+	data := binary.LittleEndian.Uint32(bs)
 
 	v.setRegu(i.Rd(), data)
 
@@ -247,7 +259,9 @@ func (v *visitor) Lw(i *riscv.Lw) bool {
 func (v *visitor) Lbu(i *riscv.Lbu) bool {
 	addr := i.Mem(v.getRegu(i.Rs1()))
 
-	data := uint32(v.Mem(addr)[0])
+	bs := v.Read(addr, 1)
+
+	data := uint32(bs[0])
 
 	v.setRegu(i.Rd(), data)
 
@@ -257,7 +271,9 @@ func (v *visitor) Lbu(i *riscv.Lbu) bool {
 func (v *visitor) Lhu(i *riscv.Lhu) bool {
 	addr := i.Mem(v.getRegu(i.Rs1()))
 
-	data := uint32(binary.LittleEndian.Uint16(v.Mem(addr)))
+	bs := v.Read(addr, 2)
+
+	data := uint32(binary.LittleEndian.Uint16(bs))
 
 	v.setRegu(i.Rd(), data)
 
@@ -268,7 +284,9 @@ func (v *visitor) Sb(i *riscv.Sb) bool {
 	addr := i.Mem(v.getRegu(i.Rs1()))
 	data := v.getRegu(i.Rs2())
 
-	v.Mem(addr)[0] = byte(data & 0xff)
+	buf := []byte{byte(data & 0xff)}
+
+	v.Write(addr, buf)
 
 	return true
 }
@@ -277,7 +295,11 @@ func (v *visitor) Sh(i *riscv.Sh) bool {
 	addr := i.Mem(v.getRegu(i.Rs1()))
 	data := uint16(v.getRegu(i.Rs2()) & 0xffff)
 
-	binary.LittleEndian.PutUint16(v.Mem(addr), data)
+	buf := make([]byte, 2)
+
+	binary.LittleEndian.PutUint16(buf, data)
+
+	v.Write(addr, buf)
 
 	return true
 }
@@ -286,7 +308,11 @@ func (v *visitor) Sw(i *riscv.Sw) bool {
 	addr := i.Mem(v.getRegu(i.Rs1()))
 	data := v.getRegu(i.Rs2())
 
-	binary.LittleEndian.PutUint32(v.Mem(addr), data)
+	buf := make([]byte, 4)
+
+	binary.LittleEndian.PutUint32(buf, data)
+
+	v.Write(addr, buf)
 
 	return true
 }

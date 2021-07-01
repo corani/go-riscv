@@ -62,9 +62,13 @@ func Load(name string) (riscv.Program, error) {
 			}
 		}
 
-		if err := binary.Read(s.Open(), binary.LittleEndian, section.MemAt(uint32(s.Addr))); err != nil {
+		buf := make([]byte, s.Size)
+
+		if err := binary.Read(s.Open(), binary.LittleEndian, buf); err != nil {
 			return nil, err
 		}
+
+		section.Write(uint32(s.Addr), buf)
 
 		program.AddSection(section)
 	}

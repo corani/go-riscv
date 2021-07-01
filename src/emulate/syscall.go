@@ -106,35 +106,37 @@ func (s *SyscallKill) Execute(v *visitor, args []uint32) uint {
 
 func (s *SyscallRead) Execute(v *visitor, args []uint32) uint {
 	fd := args[0]
-	buf := args[1]
+	addr := args[1]
 	count := args[2]
 
 	if v.verbose > 2 {
-		v.list.PrintLinef("=> read(%d, %08x, %d)\n", fd, buf, count)
+		v.list.PrintLinef("=> read(%d, %08x, %d)\n", fd, addr, count)
 	}
 
-	section := v.SectionFor(buf)
+	section := v.SectionFor(addr)
 	if section == nil {
 		v.list.PrintLinef("!! section not found")
 
 		return 0
 	}
 
-	bs := section.MemAt(buf)
+	buf := make([]byte, count)
 
-	var file *os.File
+	var in *os.File
 
 	if fd == 0 {
-		file = os.Stdin
+		in = os.Stdin
 	}
 
-	if file != nil {
-		n, err := file.Read(bs[:count])
+	if in != nil {
+		n, err := in.Read(buf)
 		if err != nil {
 			v.list.PrintLinef("!! read error: %v\n", err)
 
 			n = -1
 		} else {
+			section.Write(addr, buf[:n])
+
 			v.profile.storedBytes += uint(n)
 		}
 
@@ -152,31 +154,31 @@ func (s *SyscallRead) Execute(v *visitor, args []uint32) uint {
 
 func (s *SyscallWrite) Execute(v *visitor, args []uint32) uint {
 	fd := args[0]
-	buf := args[1]
+	addr := args[1]
 	count := args[2]
 
 	if v.verbose > 2 {
-		v.list.PrintLinef("=> write(%d, %08x, %d)\n", fd, buf, count)
+		v.list.PrintLinef("=> write(%d, %08x, %d)\n", fd, addr, count)
 	}
 
-	section := v.SectionFor(buf)
+	section := v.SectionFor(addr)
 	if section == nil {
 		return 0
 	}
 
-	bs := section.MemAt(buf)
+	buf := section.Read(addr, count)
 
-	var file *os.File
+	var out *os.File
 
 	switch fd {
 	case 1:
-		file = os.Stdout
+		out = os.Stdout
 	case 2:
-		file = os.Stderr
+		out = os.Stderr
 	}
 
-	if file != nil {
-		n, err := file.Write(bs[0:count])
+	if out != nil {
+		n, err := out.Write(buf)
 		if err != nil {
 			n = -1
 		} else {
