@@ -1,11 +1,21 @@
 package main
 
 import (
+	"github.com/corani/go-riscv/src/elf"
 	"github.com/corani/go-riscv/src/riscv"
 )
 
 func runProgram(p riscv.Program, verbose int, gas int64) int {
 	emulator := NewEmulator(verbose, p.Entry(), gas)
+
+	stdlib, err := elf.Load("bin/memio")
+	if err != nil {
+		panic(err)
+	}
+
+	for _, s := range stdlib.Sections() {
+		emulator.LoadSection(s)
+	}
 
 	for _, s := range p.Sections() {
 		emulator.LoadSection(s)

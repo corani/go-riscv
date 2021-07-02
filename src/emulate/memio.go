@@ -12,18 +12,21 @@ const (
 	memioReadStdin uint32 = iota
 	memioWriteStdout
 	memioWriteStderr
+	memioWriteExit
 )
 
-func NewMemIO(base uint32) riscv.Section {
+func NewMemIO(base uint32, v *visitor) riscv.Section {
 	return &memio{
 		base: base,
 		size: 4,
+		v:    v,
 	}
 }
 
 type memio struct {
 	base uint32
 	size uint32
+	v    *visitor
 }
 
 func (m *memio) Name() string {
@@ -77,6 +80,9 @@ func (m *memio) Write(addr uint32, data []byte) {
 		os.Stdout.Write(data)
 	case memioWriteStderr:
 		os.Stderr.Write(data)
+	case memioWriteExit:
+		m.v.done = true
+		m.v.exitCode = int(data[0])
 	}
 }
 

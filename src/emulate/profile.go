@@ -9,7 +9,6 @@ import (
 
 type profile struct {
 	inst        map[string]uint
-	ecall       map[string]uint
 	mem         map[string]uint
 	loadedBytes uint
 	storedBytes uint
@@ -17,9 +16,8 @@ type profile struct {
 
 func newProfile() *profile {
 	return &profile{
-		inst:  make(map[string]uint),
-		ecall: make(map[string]uint),
-		mem:   make(map[string]uint),
+		inst: make(map[string]uint),
+		mem:  make(map[string]uint),
 	}
 }
 
@@ -40,10 +38,6 @@ func (p *profile) recordInstruction(i riscv.Instruction) {
 	case *riscv.Sw:
 		p.storedBytes += 4
 	}
-}
-
-func (p *profile) recordSyscall(s Syscall) {
-	p.ecall[s.String()]++
 }
 
 func (p *profile) String() string {
@@ -89,17 +83,6 @@ func (p *profile) String() string {
 		res += "instructions:"
 
 		for i, pair := range sortProfile(p.inst) {
-			res += separator(i)
-			res += fmt.Sprintf("%-08s: %4d", pair.mnemonic, pair.count)
-		}
-
-		res += " |\n"
-	}
-
-	if len(p.ecall) > 0 {
-		res += "\nsyscalls:"
-
-		for i, pair := range sortProfile(p.ecall) {
 			res += separator(i)
 			res += fmt.Sprintf("%-08s: %4d", pair.mnemonic, pair.count)
 		}

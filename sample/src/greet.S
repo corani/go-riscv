@@ -20,18 +20,20 @@ _start:
 		li		a2, 6		# length
 		ecall
 
+		li		a7, 64		# syscall write
 		li		a0, 1		# 1 = StdOut
 		la		a1, name	# load address
 		mv		a2, t1		# length
 		ecall
 
+		li		a7, 64		# syscall write
 		li		a0, 1		# 1 = StdOut
 		la		a1, nl		# load address
 		li		a2, 1		# length
 		ecall
 
-		li		a0, 0		# return code
 		li		a7, 93		# syscall exit
+		li		a0, 0		# return code
 		ecall
 
 .data

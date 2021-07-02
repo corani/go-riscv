@@ -52,7 +52,6 @@ Additional command line arguments:
 - `-v N`    verbose logging
   - 1       print a profile after completion
   - 2       print the disassembly before starting
-  - 3       print each ecalls before executing
   - 4       print each instruction before executing
   - 5       print all registers after executing each instruction
 
@@ -61,6 +60,7 @@ Additional command line arguments:
 - Emulator
   - Memory mapped I/O
   - Proper trapping of ecalls
+  - Proper memory map
   - Dynamic memory
 - Create an assembler
 - Create a debugger

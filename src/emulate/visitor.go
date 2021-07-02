@@ -18,7 +18,7 @@ func NewEmulator(verbose int, entry uint32, gas int64) *visitor {
 		verbose:   verbose,
 	}
 
-	result.sections = append(result.sections, NewMemIO(0x1000_0000))
+	result.sections = append(result.sections, NewMemIO(0xffff_0000, result))
 
 	for i := 0; i < 32; i++ {
 		result.registers[riscv.Register(0)] = 0
@@ -526,6 +526,12 @@ func (v *visitor) Andi(i *riscv.Andi) bool {
 	v.setReg(i.Rd(), v.getReg(i.Rs1())&i.Imm())
 
 	return true
+}
+
+func (v *visitor) Ecall(i *riscv.Ecall) bool {
+	v.setRegu(riscv.Register(1), v.pc+4)
+
+	return v.jump(0x1000_0000)
 }
 
 func (v *visitor) jump(addr uint32) bool {
